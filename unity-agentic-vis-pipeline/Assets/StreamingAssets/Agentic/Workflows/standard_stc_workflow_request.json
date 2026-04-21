@@ -1,0 +1,65 @@
+{
+  "workflow_id": "wf_standard_stc_001",
+  "workflow_type": "Visualization_Pipeline",
+  "execution_graph": {
+    "nodes": [
+      { "id": "op_read", "type": "Read_Data_Op", "level": "L1" },
+      { "id": "op_norm", "type": "Normalize_Attributes_Op", "level": "L1" },
+      { "id": "op_time", "type": "Encode_Time_Op", "level": "L1" },
+      { "id": "op_map", "type": "Map_To_Visual_Space_Op", "level": "L1" },
+      { "id": "op_view", "type": "Build_STC_View_Bundle_Op", "level": "L2" },
+      { "id": "op_query", "type": "Create_Atomic_Query_Op", "level": "L3" },
+      { "id": "op_spatial", "type": "Apply_Spatial_Filter_Op", "level": "L3" },
+      { "id": "op_update", "type": "Update_View_Encoding_Op", "level": "L3" },
+      { "id": "op_backend", "type": "Adapted_IATK_View_Builder_Op", "level": "L3" }
+    ],
+    "edges": [
+      { "from": "op_read", "to": "op_norm" },
+      { "from": "op_norm", "to": "op_time" },
+      { "from": "op_time", "to": "op_map" },
+      { "from": "op_map", "to": "op_view" },
+      { "from": "op_view", "to": "op_query" },
+      { "from": "op_query", "to": "op_spatial" },
+      { "from": "op_spatial", "to": "op_update" },
+      { "from": "op_update", "to": "op_backend" }
+    ]
+  },
+  "input_data": {
+    "data_path": "/Users/cyt/Desktop/OperatorsDraft/demo_data/first_week_of_may_2011_10k_sample.csv"
+  },
+  "parameters": {
+    "required_view_type": "STC",
+    "require_backend_build": true,
+    "normalize_columns": [
+      "pickup_longitude",
+      "pickup_latitude",
+      "dropoff_longitude",
+      "dropoff_latitude",
+      "passenger_count",
+      "fare_amount"
+    ],
+    "time_column": "pickup_datetime",
+    "output_column": "EncodedTime",
+    "mode": "Origin",
+    "mapping": {
+      "tripIdColumn": "column_0",
+      "originXColumn": "pickup_longitude",
+      "originYColumn": "pickup_latitude",
+      "destinationXColumn": "dropoff_longitude",
+      "destinationYColumn": "dropoff_latitude",
+      "originTimeColumn": "EncodedTime",
+      "destinationTimeColumn": "EncodedTime",
+      "colorColumn": "fare_amount",
+      "sizeColumn": "passenger_count",
+      "isSTCMode": true
+    },
+    "spatial_region": {
+      "minX": 0.15,
+      "maxX": 0.55,
+      "minY": 0.25,
+      "maxY": 0.75,
+      "minTime": 0.0,
+      "maxTime": 86400.0
+    }
+  }
+}
