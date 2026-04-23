@@ -14,7 +14,7 @@ namespace OperatorPackage.Core
     {
         public int OriginalPointIndex { get; set; } = -1;
         public int SourceRowIndex { get; set; }
-        public string RowId { get; set; }
+        public string RowId { get; set; } = string.Empty;
         public PointRole Role { get; set; } = PointRole.Generic;
         public float X { get; set; }
         public float Y { get; set; }

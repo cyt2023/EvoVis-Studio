@@ -2,11 +2,11 @@ using OperatorPackage.Core;
 
 namespace OperatorPackage.Filter
 {
-    public class UpdateViewEncodingOperator : IOperator<FilterMask, ViewRepresentation>
+    public class UpdateViewEncodingOperator : IOperator<FilterMask, ViewRepresentation?>
     {
-        public ViewRepresentation TargetView { get; set; }
+        public ViewRepresentation? TargetView { get; set; }
 
-        public ViewRepresentation Execute(FilterMask input)
+        public ViewRepresentation? Execute(FilterMask input)
         {
             if (TargetView == null || input == null)
                 return TargetView;

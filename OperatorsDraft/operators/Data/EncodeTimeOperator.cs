@@ -6,7 +6,7 @@ namespace OperatorPackage.Data
 {
     public class EncodeTimeOperator : IOperator<TabularData, TabularData>
     {
-        public string TimeColumn { get; set; }
+        public string TimeColumn { get; set; } = string.Empty;
         public string OutputColumn { get; set; } = "EncodedTime";
         public string MinTimeMetadataKey { get; set; } = "Time.Min";
         public string MaxTimeMetadataKey { get; set; } = "Time.Max";

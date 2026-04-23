@@ -25,7 +25,7 @@
     ]
   },
   "input_data": {
-    "data_path": "/Users/cyt/Desktop/OperatorsDraft/demo_data/first_week_of_may_2011_10k_sample.csv"
+    "data_path": "../OperatorsDraft/demo_data/first_week_of_may_2011_10k_sample.csv"
   },
   "parameters": {
     "required_view_type": "STC",

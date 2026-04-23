@@ -266,6 +266,8 @@ public static class Program
 
         view = builder.Build(view);
         view = backend.CreateView(view);
+        if (view == null)
+            return null;
 
         foreach (var coordinatedView in view.CoordinatedViews)
         {

@@ -1,5 +1,10 @@
 import dashscope
 from dashscope import Generation
-dashscope.api_key = "sk-46e10056c68741a6a2af41f11b3b8584" 
-response = Generation.call(model=Generation.Models.qwen_turbo, prompt="测试")
+import os
+
+api_key = os.environ.get("DASHSCOPE_API_KEY", "").strip()
+if not api_key:
+    raise SystemExit("DASHSCOPE_API_KEY is not set.")
+
+response = Generation.call(model=Generation.Models.qwen_turbo, api_key=api_key, prompt="测试")
 print(response)

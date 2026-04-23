@@ -5,7 +5,7 @@ namespace OperatorPackage.Data
 {
     public class MapToVisualSpaceOperator : IOperator<TabularData, VisualPointData>
     {
-        public VisualMapping Mapping { get; set; }
+        public VisualMapping? Mapping { get; set; }
 
         public VisualPointData Execute(TabularData input)
         {
@@ -84,18 +84,19 @@ namespace OperatorPackage.Data
 
         private string GetRowId(System.Collections.Generic.Dictionary<string, object> row, int rowIndex)
         {
-            if (!string.IsNullOrWhiteSpace(Mapping.TripIdColumn) &&
+            var mapping = Mapping;
+            if (!string.IsNullOrWhiteSpace(mapping?.TripIdColumn) &&
                 row != null &&
-                row.TryGetValue(Mapping.TripIdColumn, out var value) &&
+                row.TryGetValue(mapping.TripIdColumn, out var value) &&
                 value != null)
             {
-                return value.ToString();
+                return value.ToString() ?? $"row-{rowIndex}";
             }
 
             return $"row-{rowIndex}";
         }
 
-        private float GetFloat(System.Collections.Generic.Dictionary<string, object> row, string columnName)
+        private float GetFloat(System.Collections.Generic.Dictionary<string, object> row, string? columnName)
         {
             if (string.IsNullOrEmpty(columnName) || row == null || !row.ContainsKey(columnName))
                 return 0f;

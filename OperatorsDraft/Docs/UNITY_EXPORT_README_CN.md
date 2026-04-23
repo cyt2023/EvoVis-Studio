@@ -34,12 +34,12 @@ Unity 后续只需要读取：
 
 ### 导出文件在哪里生成
 当前由：
-[operator_search_main.py](/Users/cyt/Desktop/OperatorsDraft/evoflow/operator_search_main.py)
+[operator_search_main.py](evoflow/operator_search_main.py)
 
 在最佳 workflow 选出后生成。
 
 默认输出位置是：
-[unity_export.json](/Users/cyt/Desktop/OperatorsDraft/exports/unity_export.json)
+[unity_export.json](exports/unity_export.json)
 
 也可以通过 `--export-json` 指定输出路径。
 
@@ -72,42 +72,42 @@ Unity 后续只需要读取：
 现在也可以直接用仓库根目录的一键脚本：
 
 ```bash
-/Users/cyt/Desktop/OperatorsDraft/run_evoflow.sh --help
+./run_evoflow.sh --help
 ```
 
 例如：
 
 ```bash
-/Users/cyt/Desktop/OperatorsDraft/run_evoflow.sh \
+./run_evoflow.sh \
   --task "Find concentrated morning pickup hotspots in the Hurricane Sandy sample and render them as a backend-ready point visualization." \
-  --data-path /Users/cyt/Desktop/OperatorsDraft/demo_data/hurricane_sandy_2012_100k_sample.csv \
+  --data-path ./demo_data/hurricane_sandy_2012_100k_sample.csv \
   --population 1 \
   --generations 0 \
   --elite-size 1 \
-  --export-json /Users/cyt/Desktop/OperatorsDraft/exports/test3.json \
+  --export-json ./exports/test3.json \
   --task-id test3
 ```
 
 等价的完整环境变量命令如下：
 
 ```bash
-PYTHONPATH=/Users/cyt/Desktop/OperatorsDraft/.python_deps \
-HOME=/Users/cyt/Desktop/OperatorsDraft \
-DOTNET_CLI_HOME=/Users/cyt/Desktop/OperatorsDraft \
-PATH=/Users/cyt/Desktop/OperatorsDraft/.dotnet:$PATH \
-python3 /Users/cyt/Desktop/OperatorsDraft/evoflow/operator_search_main.py \
+PYTHONPATH=./.python_deps \
+HOME=. \
+DOTNET_CLI_HOME=. \
+PATH=./.dotnet:$PATH \
+python3 ./evoflow/operator_search_main.py \
   --task "Create a backend-ready STC visualization of morning taxi origin hotspots from the first-week sample after spatial and temporal filtering." \
-  --data-path /Users/cyt/Desktop/OperatorsDraft/demo_data/first_week_of_may_2011_10k_sample.csv \
+  --data-path ./demo_data/first_week_of_may_2011_10k_sample.csv \
   --population 1 \
   --generations 0 \
   --elite-size 1 \
-  --export-json /Users/cyt/Desktop/OperatorsDraft/exports/first_week_unity_export.json \
+  --export-json ./exports/first_week_unity_export.json \
   --task-id first-week-morning-hotspots
 ```
 
 ### 当前样例导出文件
 样例文件已生成在：
-[first_week_unity_export.json](/Users/cyt/Desktop/OperatorsDraft/exports/first_week_unity_export.json)
+[first_week_unity_export.json](exports/first_week_unity_export.json)
 
 ### Unity 以后怎么接
 未来 Unity 侧不需要接 EvoFlow 搜索过程本身，只需要：

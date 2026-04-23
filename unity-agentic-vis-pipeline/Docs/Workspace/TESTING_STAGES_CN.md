@@ -29,13 +29,13 @@ Unity 桌面 App -> 本地 EvoFlow 后端服务 -> workflow/render JSON -> Unity
 后端项目：
 
 ```text
-/Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft
+../OperatorsDraft
 ```
 
 Unity 项目：
 
 ```text
-/Users/cyt/Desktop/untiy-project-hkust/unity-agentic-vis-pipeline
+../unity-agentic-vis-pipeline
 ```
 
 ### 应该看到的关键文件
@@ -72,7 +72,7 @@ unity-agentic-vis-pipeline/Assets/Scripts/Agentic/Unity/BackendServiceRenderCont
 在终端运行：
 
 ```bash
-cd /Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft
+cd ../OperatorsDraft
 ./run_backend_server.sh
 ```
 
@@ -281,7 +281,7 @@ curl -X POST http://127.0.0.1:8000/api/render/run \
 2. 打开 Unity 项目：
 
 ```text
-/Users/cyt/Desktop/untiy-project-hkust/unity-agentic-vis-pipeline
+../unity-agentic-vis-pipeline
 ```
 
 3. 在场景中新建一个空物体。
@@ -370,7 +370,7 @@ Unity Console 没有出现请求失败、连接失败或 JSON 解析失败。
 1. 保持后端服务运行：
 
 ```bash
-cd /Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft
+cd ../OperatorsDraft
 ./run_backend_server.sh
 ```
 
@@ -529,7 +529,7 @@ Unity App 启动时自动拉起本地后端进程
 1. 打开 Unity 项目：
 
 ```text
-/Users/cyt/Desktop/untiy-project-hkust/unity-agentic-vis-pipeline
+../unity-agentic-vis-pipeline
 ```
 
 2. 新建一个空场景。

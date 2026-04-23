@@ -1,9 +1,9 @@
 import dashscope
 from dashscope import Generation
+import os
 import time
 
 dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
-dashscope.api_key = "sk-46e10056c68741a6a2af41f11b3b8584"
 
 MODEL_MAP = {
     "small": "qwen-turbo",
@@ -12,6 +12,11 @@ MODEL_MAP = {
 }
 
 def run_qwen_llm(model_size, prompt, temperature=0.7):
+    api_key = os.environ.get("DASHSCOPE_API_KEY", "").strip()
+    if not api_key:
+        print("[Qwen] DASHSCOPE_API_KEY is not set; returning ERROR.", flush=True)
+        return "ERROR"
+
     model_name = MODEL_MAP[model_size]
     print(f"[Qwen] Starting request | model={model_name} | temperature={temperature}", flush=True)
 
@@ -24,7 +29,7 @@ def run_qwen_llm(model_size, prompt, temperature=0.7):
         started_at = time.time()
         response = Generation.call(
             model=model_name,
-            api_key=dashscope.api_key,
+            api_key=api_key,
             messages=messages,
             temperature=temperature,
             result_format="message",

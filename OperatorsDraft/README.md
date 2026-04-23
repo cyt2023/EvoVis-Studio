@@ -52,7 +52,7 @@ Python orchestration layer for:
 
 Main entry point:
 
-- [operator_search_main.py](/Users/cyt/Desktop/OperatorsDraft/evoflow/operator_search_main.py)
+- [operator_search_main.py](evoflow/operator_search_main.py)
 
 ### `OperatorRunner/`
 .NET execution layer that:
@@ -75,29 +75,41 @@ These contain the C# operator implementations used by the workflow search.
 ### `demo_data/`
 Current example datasets:
 
-- [taxi_od_small.csv](/Users/cyt/Desktop/OperatorsDraft/demo_data/taxi_od_small.csv)
-- [first_week_of_may_2011_10k_sample.csv](/Users/cyt/Desktop/OperatorsDraft/demo_data/first_week_of_may_2011_10k_sample.csv)
-- [hurricane_sandy_2012_100k_sample.csv](/Users/cyt/Desktop/OperatorsDraft/demo_data/hurricane_sandy_2012_100k_sample.csv)
+- [taxi_od_small.csv](demo_data/taxi_od_small.csv)
+- [first_week_of_may_2011_10k_sample.csv](demo_data/first_week_of_may_2011_10k_sample.csv)
+- [hurricane_sandy_2012_100k_sample.csv](demo_data/hurricane_sandy_2012_100k_sample.csv)
 
 ### `exports/`
 Example exported JSON artifacts:
 
-- [test3.json](/Users/cyt/Desktop/OperatorsDraft/exports/test3.json)
-- [test3_schema_sample.json](/Users/cyt/Desktop/OperatorsDraft/exports/test3_schema_sample.json)
-- [hurricane_sandy_unity_export.json](/Users/cyt/Desktop/OperatorsDraft/exports/hurricane_sandy_unity_export.json)
+- [test3.json](exports/test3.json)
+- [test3_schema_sample.json](exports/test3_schema_sample.json)
+- [hurricane_sandy_unity_export.json](exports/hurricane_sandy_unity_export.json)
 
 ## Quick Start
+
+Install Python dependencies if `.python_deps/` is not already present in your local workspace:
+
+```bash
+python3 -m pip install -r requirements.txt -t ./.python_deps
+```
+
+Dynamic LLM-backed runs require a DashScope API key:
+
+```bash
+export DASHSCOPE_API_KEY="..."
+```
 
 Use the one-command launcher:
 
 ```bash
 ./run_evoflow.sh \
   --task "Find concentrated morning pickup hotspots in the Hurricane Sandy sample and render them as a backend-ready point visualization." \
-  --data-path /Users/cyt/Desktop/OperatorsDraft/demo_data/hurricane_sandy_2012_100k_sample.csv \
+  --data-path ./demo_data/hurricane_sandy_2012_100k_sample.csv \
   --population 1 \
   --generations 0 \
   --elite-size 1 \
-  --export-json /Users/cyt/Desktop/OperatorsDraft/exports/test3.json \
+  --export-json ./exports/test3.json \
   --task-id test3
 ```
 
@@ -106,6 +118,43 @@ You can also inspect the CLI help:
 ```bash
 ./run_evoflow.sh --help
 ```
+
+## Delivery Checks
+
+Before handing off or packaging this backend, run the project doctor:
+
+```bash
+./doctor.sh
+```
+
+The doctor performs the current minimum delivery gate:
+
+- Python syntax checks for the backend service and contract validator
+- EvoFlow CLI smoke test
+- local .NET SDK check
+- `OperatorRunner` build with nullable warnings enabled
+- demo asset presence checks
+- backend render-contract unit tests
+- sample Unity render-contract validation
+
+You can also validate a single export directly:
+
+```bash
+./scripts/validate_render_contract.py ./exports/test3.json --limit 1000 --no-selected-ids
+```
+
+For local Unity/backend-service integration, start:
+
+```bash
+./run_backend_server.sh
+```
+
+Useful service endpoints:
+
+- `GET http://127.0.0.1:8000/api/health`
+- `GET http://127.0.0.1:8000/api/datasets`
+- `GET http://127.0.0.1:8000/api/render/test3?limit=1000&includeSelectedIds=false`
+- `GET http://127.0.0.1:8000/api/render/test3?summary=true`
 
 ## Example Result
 
@@ -145,15 +194,15 @@ The most important section is `visualization`, which now uses a more explicit fi
 
 For lightweight schema alignment there is also a smaller sample file:
 
-- [test3_schema_sample.json](/Users/cyt/Desktop/OperatorsDraft/exports/test3_schema_sample.json)
+- [test3_schema_sample.json](exports/test3_schema_sample.json)
 
 For real runtime-side integration, use the full artifact:
 
-- [test3.json](/Users/cyt/Desktop/OperatorsDraft/exports/test3.json)
+- [test3.json](exports/test3.json)
 
 More detail:
 
-- [UNITY_EXPORT_README_CN.md](/Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft/Docs/UNITY_EXPORT_README_CN.md)
+- [UNITY_EXPORT_README_CN.md](Docs/UNITY_EXPORT_README_CN.md)
 
 ## Current Status
 
@@ -166,13 +215,16 @@ What is already working:
 - LLM-assisted evaluation
 - weakly supervised result scoring when no `expectedRowIds` are available
 - Unity-facing export JSON generation
+- local backend service for Unity consumption
+- automated backend doctor and render-contract validation
 
 What is still improving:
 
 - hotspot quality and concentration
 - LLM timeout / retry stability
 - broader cross-dataset generalization
-- further simplification of the Unity-facing contract
+- Unity Editor/build rendering validation
+- packaging layout for a standalone desktop app
 
 ## Suggested Repo Name
 
@@ -190,9 +242,9 @@ Other acceptable alternatives:
 
 Supporting project notes are organized under `Docs/`:
 
-- [UPDATE_EVOFLOW_OPERATOR_WORKFLOW_CN.md](/Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft/Docs/UPDATE_EVOFLOW_OPERATOR_WORKFLOW_CN.md)
-- [EVOFLOW_INTERFACE_SPEC_CN.md](/Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft/Docs/EVOFLOW_INTERFACE_SPEC_CN.md)
-- [ADVISOR_NOTE_CN.md](/Users/cyt/Desktop/untiy-project-hkust/OperatorsDraft/Docs/ADVISOR_NOTE_CN.md)
+- [UPDATE_EVOFLOW_OPERATOR_WORKFLOW_CN.md](Docs/UPDATE_EVOFLOW_OPERATOR_WORKFLOW_CN.md)
+- [EVOFLOW_INTERFACE_SPEC_CN.md](Docs/EVOFLOW_INTERFACE_SPEC_CN.md)
+- [ADVISOR_NOTE_CN.md](Docs/ADVISOR_NOTE_CN.md)
 
 ## Summary
 

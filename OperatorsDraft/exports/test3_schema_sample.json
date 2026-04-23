@@ -4,7 +4,7 @@
     "exportedAt": "2026-04-09T10:09:52.335328+00:00",
     "taskId": "test3",
     "datasetProfile": "inferred_hurricane_sandy_2012_100k_sample",
-    "sourceDataPath": "/Users/cyt/Desktop/OperatorsDraft/demo_data/hurricane_sandy_2012_100k_sample.csv"
+    "sourceDataPath": "demo_data/hurricane_sandy_2012_100k_sample.csv"
   },
   "task": {
     "rawText": "Find concentrated morning pickup hotspots in the Hurricane Sandy sample and render them as a backend-ready point visualization.",

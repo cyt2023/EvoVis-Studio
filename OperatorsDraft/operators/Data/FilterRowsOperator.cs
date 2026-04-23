@@ -4,8 +4,8 @@ namespace OperatorPackage.Data
 {
     public class FilterRowsOperator : IOperator<TabularData, TabularData>
     {
-        public string FilterColumn { get; set; }
-        public string FilterValue { get; set; }
+        public string FilterColumn { get; set; } = string.Empty;
+        public string FilterValue { get; set; } = string.Empty;
 
         public TabularData Execute(TabularData input)
         {

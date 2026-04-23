@@ -14,12 +14,12 @@ namespace OperatorPackage.Core
 
     public class ViewRepresentation
     {
-        public string ViewName { get; set; }
+        public string ViewName { get; set; } = string.Empty;
         public ViewType Type { get; set; }
-        public VisualPointData PointData { get; set; }
+        public VisualPointData? PointData { get; set; }
         public PointRole? Role { get; set; }
-        public string ProjectionKind { get; set; }
-        public object BackendViewObject { get; set; }
+        public string? ProjectionKind { get; set; }
+        public object? BackendViewObject { get; set; }
         public Dictionary<string, object> EncodingState { get; set; } = new Dictionary<string, object>();
         public List<ViewRepresentation> CoordinatedViews { get; set; } = new List<ViewRepresentation>();
 

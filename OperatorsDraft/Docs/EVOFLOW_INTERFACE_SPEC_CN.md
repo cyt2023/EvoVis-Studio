@@ -155,7 +155,7 @@
 
 对应：
 
-- [ReadDataOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Data/ReadDataOperator.cs)
+- [ReadDataOperator.cs](../operators/Data/ReadDataOperator.cs)
 
 功能：
 
@@ -209,7 +209,7 @@ Output:
 
 对应：
 
-- [EncodeTimeOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Data/EncodeTimeOperator.cs)
+- [EncodeTimeOperator.cs](../operators/Data/EncodeTimeOperator.cs)
 
 功能：
 
@@ -264,7 +264,7 @@ Output:
 
 对应：
 
-- [MapToVisualSpaceOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Data/MapToVisualSpaceOperator.cs)
+- [MapToVisualSpaceOperator.cs](../operators/Data/MapToVisualSpaceOperator.cs)
 
 功能：
 
@@ -343,7 +343,7 @@ Output:
 
 对应：
 
-- [BuildPointViewOperator.cs](/Users/cyt/Desktop/OperatorsDraft/View/BuildPointViewOperator.cs)
+- [BuildPointViewOperator.cs](../operators/View/BuildPointViewOperator.cs)
 
 功能：
 
@@ -401,7 +401,7 @@ Output:
 
 对应：
 
-- [BuildLinkViewOperator.cs](/Users/cyt/Desktop/OperatorsDraft/View/BuildLinkViewOperator.cs)
+- [BuildLinkViewOperator.cs](../operators/View/BuildLinkViewOperator.cs)
 
 功能：
 
@@ -458,7 +458,7 @@ Output:
 
 对应：
 
-- [BuildSTCViewOperator.cs](/Users/cyt/Desktop/OperatorsDraft/View/BuildSTCViewOperator.cs)
+- [BuildSTCViewOperator.cs](../operators/View/BuildSTCViewOperator.cs)
 
 功能：
 
@@ -520,7 +520,7 @@ Output:
 
 对应：
 
-- [Build2DProjectionViewOperator.cs](/Users/cyt/Desktop/OperatorsDraft/View/Build2DProjectionViewOperator.cs)
+- [Build2DProjectionViewOperator.cs](../operators/View/Build2DProjectionViewOperator.cs)
 
 功能：
 
@@ -577,8 +577,8 @@ Output:
 
 对应：
 
-- [AdaptedIATKViewBuilderOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Backend/AdaptedIATKViewBuilderOperator.cs)
-- [AdaptedIATKViewOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Backend/AdaptedIATKViewOperator.cs)
+- [AdaptedIATKViewBuilderOperator.cs](../operators/Backend/AdaptedIATKViewBuilderOperator.cs)
+- [AdaptedIATKViewOperator.cs](../operators/Backend/AdaptedIATKViewOperator.cs)
 
 功能：
 
@@ -644,7 +644,7 @@ Output:
 
 对应：
 
-- [CreateAtomicQueryOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Query/CreateAtomicQueryOperator.cs)
+- [CreateAtomicQueryOperator.cs](../operators/Query/CreateAtomicQueryOperator.cs)
 
 功能：
 
@@ -706,7 +706,7 @@ Output:
 
 对应：
 
-- [CreateDirectionalQueryOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Query/CreateDirectionalQueryOperator.cs)
+- [CreateDirectionalQueryOperator.cs](../operators/Query/CreateDirectionalQueryOperator.cs)
 
 功能：
 
@@ -760,7 +760,7 @@ Output:
 
 对应：
 
-- [RecurrentQueryComposeOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Query/RecurrentQueryComposeOperator.cs)
+- [RecurrentQueryComposeOperator.cs](../operators/Query/RecurrentQueryComposeOperator.cs)
 
 功能：
 
@@ -818,7 +818,7 @@ Output:
 
 对应：
 
-- [ApplySpatialFilterOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Filter/ApplySpatialFilterOperator.cs)
+- [ApplySpatialFilterOperator.cs](../operators/Filter/ApplySpatialFilterOperator.cs)
 
 功能：
 
@@ -869,7 +869,7 @@ Output:
 
 对应：
 
-- [ApplyTemporalFilterOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Filter/ApplyTemporalFilterOperator.cs)
+- [ApplyTemporalFilterOperator.cs](../operators/Filter/ApplyTemporalFilterOperator.cs)
 
 功能：
 
@@ -903,7 +903,7 @@ Output 示例：
 
 对应：
 
-- [CombineFiltersOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Filter/CombineFiltersOperator.cs)
+- [CombineFiltersOperator.cs](../operators/Filter/CombineFiltersOperator.cs)
 
 功能：
 
@@ -958,7 +958,7 @@ Output:
 
 对应：
 
-- [UpdateViewEncodingOperator.cs](/Users/cyt/Desktop/OperatorsDraft/Filter/UpdateViewEncodingOperator.cs)
+- [UpdateViewEncodingOperator.cs](../operators/Filter/UpdateViewEncodingOperator.cs)
 
 功能：
 

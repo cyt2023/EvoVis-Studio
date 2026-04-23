@@ -4,7 +4,7 @@ namespace OperatorPackage.Query
 {
     public class CreateDirectionalQueryOperator : IOperator<QueryDefinition, QueryDefinition>
     {
-        public QueryDefinition DestinationQuery { get; set; }
+        public QueryDefinition? DestinationQuery { get; set; }
 
         public QueryDefinition Execute(QueryDefinition originQuery)
         {

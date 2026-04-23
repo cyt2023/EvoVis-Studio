@@ -57,20 +57,20 @@ namespace OperatorPackage.Core
 
         public List<QueryDefinition> SubQueries { get; set; } = new List<QueryDefinition>();
 
-        public Func<VisualPoint, bool> Predicate { get; set; }
+        public Func<VisualPoint, bool>? Predicate { get; set; }
 
-        public SpatialRegion3D SpatialRegion { get; set; }
-        public TimeWindow TimeWindow { get; set; }
-        public QueryDefinition OriginQuery { get; set; }
-        public QueryDefinition DestinationQuery { get; set; }
+        public SpatialRegion3D? SpatialRegion { get; set; }
+        public TimeWindow? TimeWindow { get; set; }
+        public QueryDefinition? OriginQuery { get; set; }
+        public QueryDefinition? DestinationQuery { get; set; }
         public List<int> Years { get; set; } = new List<int>();
         public List<int> Months { get; set; } = new List<int>();
         public List<DayOfWeek> DaysOfWeek { get; set; } = new List<DayOfWeek>();
         public List<int> Hours { get; set; } = new List<int>();
 
-        public string OriginColumn { get; set; }
-        public string DestinationColumn { get; set; }
-        public string TimeColumn { get; set; }
+        public string? OriginColumn { get; set; }
+        public string? DestinationColumn { get; set; }
+        public string? TimeColumn { get; set; }
 
         public string ToDebugString()
         {

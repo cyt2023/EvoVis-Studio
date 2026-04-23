@@ -10,7 +10,7 @@ namespace OperatorPackage.Core
 
         public int RowCount => Rows?.Count ?? 0;
 
-        public object GetValue(int rowIndex, string columnName)
+        public object? GetValue(int rowIndex, string columnName)
         {
             if (rowIndex < 0 || rowIndex >= RowCount || string.IsNullOrWhiteSpace(columnName))
                 return null;

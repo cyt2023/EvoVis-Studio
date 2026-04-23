@@ -16,7 +16,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parent
 EXPORTS_DIR = ROOT / "exports"
@@ -178,7 +178,34 @@ def as_int(value: Any, fallback: int = 0) -> int:
         return fallback
 
 
-def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, Any]:
+def as_bool(value: Any, fallback: bool = False) -> bool:
+    if value is None:
+        return fallback
+    if isinstance(value, bool):
+        return value
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes", "y", "on"}:
+        return True
+    if text in {"0", "false", "no", "n", "off"}:
+        return False
+    return fallback
+
+
+def first_query_value(query: Dict[str, List[str]], name: str, default: str = "") -> str:
+    values = query.get(name)
+    if not values:
+        return default
+    return values[0]
+
+
+def adapt_to_unity_backend_result(
+    evoflow_result: Dict[str, Any],
+    *,
+    point_limit: int | None = None,
+    include_selected_ids: bool = True,
+    include_links: bool = True,
+    summary_only: bool = False,
+) -> Dict[str, Any]:
     render_plan = evoflow_result.get("visualization", {}).get("renderPlan", {})
     primary_view = render_plan.get("primaryView", {})
     geometry = render_plan.get("geometry", {})
@@ -195,8 +222,17 @@ def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, A
     )
     selected_set = {str(item) for item in selected_ids}
 
+    raw_points = geometry.get("points", [])
+    total_point_count = len(raw_points) if isinstance(raw_points, list) else 0
+    if summary_only:
+        point_source = []
+    elif point_limit is not None and point_limit >= 0:
+        point_source = raw_points[:point_limit]
+    else:
+        point_source = raw_points
+
     points: List[Dict[str, Any]] = []
-    for point in geometry.get("points", []):
+    for point in point_source:
         position = point.get("position", {})
         row_id = str(point.get("rowId", point.get("pointId", "")))
         points.append(
@@ -210,8 +246,9 @@ def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, A
             }
         )
 
+    raw_links = geometry.get("links", []) if include_links and not summary_only else []
     links: List[Dict[str, Any]] = []
-    for link in geometry.get("links", []):
+    for link in raw_links:
         links.append(
             {
                 "originIndex": as_int(link.get("originIndex")),
@@ -225,6 +262,7 @@ def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, A
     view_name = str(primary_view.get("name") or "EvoFlowView")
     include_links = bool(links) and view_type.strip().upper() in {"STC", "LINK", "LINKS"}
     selected_count = as_int(result_summary.get("selectedPointCount"), len(selected_set))
+    returned_selected_ids = selected_ids if include_selected_ids else []
 
     return {
         "meta": {"schemaVersion": "2.0.0-unity-backend-service"},
@@ -252,6 +290,9 @@ def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, A
                     "links": links,
                     "encodingState": {
                         "selectedCount": selected_count,
+                        "totalPointCount": total_point_count,
+                        "returnedPointCount": len(points),
+                        "truncated": len(points) < total_point_count,
                         "highlightMode": str(
                             evoflow_result.get("visualization", {})
                             .get("intent", {})
@@ -262,10 +303,27 @@ def adapt_to_unity_backend_result(evoflow_result: Dict[str, Any]) -> Dict[str, A
             ]
         },
         "resultSummary": {
-            "selectedRowIds": selected_ids,
+            "selectedRowIds": returned_selected_ids,
             "selectedPointCount": selected_count,
+            "totalPointCount": total_point_count,
+            "returnedPointCount": len(points),
+            "truncated": len(points) < total_point_count,
             "backendBuilt": bool(result_summary.get("backendBuilt", primary_view.get("backendReady", False))),
         },
+    }
+
+
+def render_options_from_query(query: Dict[str, List[str]]) -> Dict[str, Any]:
+    limit_text = first_query_value(query, "limit", "").strip()
+    point_limit = None
+    if limit_text:
+        point_limit = max(0, int(limit_text))
+
+    return {
+        "point_limit": point_limit,
+        "include_selected_ids": as_bool(first_query_value(query, "includeSelectedIds", "true"), True),
+        "include_links": as_bool(first_query_value(query, "includeLinks", "true"), True),
+        "summary_only": as_bool(first_query_value(query, "summary", "false"), False),
     }
 
 
@@ -280,6 +338,7 @@ class EvoFlowRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/") or "/"
+        query = parse_qs(parsed.query)
 
         try:
             if path in {"/", "/health", "/api", "/api/health"}:
@@ -298,7 +357,7 @@ class EvoFlowRequestHandler(BaseHTTPRequestHandler):
             if path.startswith("/render/") or path.startswith("/api/render/"):
                 workflow_id = path.split("/")[-1]
                 workflow = load_json(resolve_workflow_path(workflow_id))
-                self.write_json(adapt_to_unity_backend_result(workflow))
+                self.write_json(adapt_to_unity_backend_result(workflow, **render_options_from_query(query)))
                 return
 
             self.write_json(error_payload("routing", f"Unknown endpoint: {path}"), status=404)
@@ -318,7 +377,13 @@ class EvoFlowRequestHandler(BaseHTTPRequestHandler):
 
             if path in {"/render/run", "/api/render/run"}:
                 workflow = workflow_from_run_body(body)
-                self.write_json(adapt_to_unity_backend_result(workflow))
+                options = {
+                    "point_limit": int(body["limit"]) if body.get("limit") is not None else None,
+                    "include_selected_ids": as_bool(body.get("includeSelectedIds"), True),
+                    "include_links": as_bool(body.get("includeLinks"), True),
+                    "summary_only": as_bool(body.get("summary"), False),
+                }
+                self.write_json(adapt_to_unity_backend_result(workflow, **options))
                 return
 
             self.write_json(error_payload("routing", f"Unknown endpoint: {path}"), status=404)
@@ -378,6 +443,7 @@ def main() -> None:
     print("  GET /api/datasets")
     print("  GET /api/workflow/test3")
     print("  GET /api/render/test3")
+    print("  GET /api/render/test3?limit=1000&includeSelectedIds=false")
     print("  POST /api/workflow/run")
     print("  POST /api/render/run")
     print("    body: { workflowId, task, dataset, execute=false }")

@@ -4,7 +4,7 @@ namespace OperatorPackage.Backend
 {
     public class AdaptedIATKViewBuilderOperator
     {
-        public ViewRepresentation Build(ViewRepresentation view)
+        public ViewRepresentation? Build(ViewRepresentation? view)
         {
             if (view == null)
                 return null;

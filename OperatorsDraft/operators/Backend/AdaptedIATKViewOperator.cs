@@ -4,7 +4,7 @@ namespace OperatorPackage.Backend
 {
     public class AdaptedIATKViewOperator : IAdaptedIATKAdapter
     {
-        public ViewRepresentation CreateView(ViewRepresentation view)
+        public ViewRepresentation? CreateView(ViewRepresentation? view)
         {
             if (view == null)
                 return null;
@@ -22,7 +22,7 @@ namespace OperatorPackage.Backend
             return view;
         }
 
-        public ViewRepresentation UpdateView(ViewRepresentation view, FilterMask mask)
+        public ViewRepresentation? UpdateView(ViewRepresentation? view, FilterMask mask)
         {
             view?.ApplyMask(mask);
             if (view != null)

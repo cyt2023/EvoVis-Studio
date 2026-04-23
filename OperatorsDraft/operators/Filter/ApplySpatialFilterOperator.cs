@@ -4,7 +4,7 @@ namespace OperatorPackage.Filter
 {
     public class ApplySpatialFilterOperator : IOperator<VisualPointData, FilterMask>
     {
-        public QueryDefinition Query { get; set; }
+        public QueryDefinition? Query { get; set; }
 
         public FilterMask Execute(VisualPointData input)
         {
