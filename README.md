@@ -7,12 +7,23 @@ EvoVis Studio is a desktop-oriented agentic visualization project that connects:
 - JSON-based result exchange
 - Unity-based interactive visualization rendering on the frontend
 
-This repository is a project-level snapshot that combines both sides of the system into one top-level project:
+This repository is an independent project-level codebase. It includes both sides of the system in one top-level project:
 
 - a Unity desktop visualization frontend
 - an EvoFlow-style backend runtime and local service
 
+The two folders are regular directories in this repository, not submodules and not separate repositories from the point of view of this project.
+
 The current direction is not a browser application. The intended form is a desktop app workflow in which Unity acts as the visualization frontend and the backend provides workflow and render results locally.
+
+## Project Origin
+
+EvoVis Studio is based on two earlier project parts that were developed separately:
+
+- Backend foundation: [`cyt2023/evoflow-vis-runtime`](https://github.com/cyt2023/evoflow-vis-runtime)
+- Unity frontend foundation: [`cyt2023/unity-agentic-vis-pipeline`](https://github.com/cyt2023/unity-agentic-vis-pipeline)
+
+This repository brings those parts together as one deliverable project. The source is copied into `OperatorsDraft/` and `unity-agentic-vis-pipeline/` so the project can be cloned, reviewed, tested, and handed off as a single repository.
 
 ## Project Goal
 
