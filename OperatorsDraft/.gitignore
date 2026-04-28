@@ -1,8 +1,11 @@
 # Local runtime caches
+.env
+.env.local
 .python_deps/
 .dotnet/
 .local/
 .nuget/
+.build/
 Library/
 __pycache__/
 *.py[cod]
@@ -17,3 +20,7 @@ OperatorRunner/obj/
 
 # Generated EvoFlow outputs. Keep curated samples tracked explicitly if needed.
 exports/unity_*.json
+build/
+dist/
+OperatorRunnerPublished/
+*.spec

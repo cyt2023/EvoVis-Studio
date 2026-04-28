@@ -1,5 +1,6 @@
 #if UNITY_EDITOR
 using System.IO;
+using System;
 using ImmersiveTaxiVis.Integration.Controllers;
 using ImmersiveTaxiVis.Integration.Runtime;
 using UnityEditor;
@@ -16,6 +17,21 @@ namespace ImmersiveTaxiVis.Integration.Editor
         private const string AgenticSceneDirectory = "Assets/Scenes/Agentic";
         private const string AgenticScenePath = AgenticSceneDirectory + "/DesktopAgenticApp.unity";
 
+        [MenuItem("Tools/ImmersiveTaxiVis/Allow Local HTTP Backend")]
+        public static void AllowLocalHttpBackend()
+        {
+            var property = typeof(PlayerSettings).GetProperty("insecureHttpOption");
+            if (property == null)
+            {
+                Debug.LogWarning("This Unity version does not expose PlayerSettings.insecureHttpOption.");
+                return;
+            }
+
+            property.SetValue(null, Enum.ToObject(property.PropertyType, 2));
+            AssetDatabase.SaveAssets();
+            Debug.Log("Allowed HTTP downloads for local EvoFlow backend requests.");
+        }
+
         [MenuItem("Tools/ImmersiveTaxiVis/Create Backend Frontend Demo Scene")]
         public static void CreateBackendFrontendDemoScene()
         {
@@ -30,12 +46,12 @@ namespace ImmersiveTaxiVis.Integration.Editor
             bootstrap.createLightIfMissing = true;
             bootstrap.createJsonControllerIfMissing = true;
             bootstrap.jsonRelativePath = "result_multiview.json";
-            bootstrap.pointSize = 0.15f;
+            bootstrap.pointSize = 0.18f;
             bootstrap.renderLinks = true;
-            bootstrap.cameraPosition = new Vector3(0.5f, 0.65f, -4.5f);
-            bootstrap.cameraLookTarget = new Vector3(0.5f, 0.5f, 0.5f);
+            bootstrap.cameraPosition = new Vector3(0.85f, 0.72f, -1.15f);
+            bootstrap.cameraLookTarget = new Vector3(0f, 0.08f, 0f);
             bootstrap.renderRootLocalPosition = new Vector3(0f, 0f, 0f);
-            bootstrap.renderRootLocalScale = new Vector3(4f, 4f, 4f);
+            bootstrap.renderRootLocalScale = new Vector3(1.85f, 1.85f, 1.85f);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath);
@@ -60,6 +76,7 @@ namespace ImmersiveTaxiVis.Integration.Editor
         [MenuItem("Tools/ImmersiveTaxiVis/Create Desktop Agentic App Scene")]
         public static void CreateDesktopAgenticAppScene()
         {
+            AllowLocalHttpBackend();
             EnsureSceneDirectory();
             EnsureAgenticSceneDirectory();
 
@@ -71,15 +88,20 @@ namespace ImmersiveTaxiVis.Integration.Editor
             bootstrap.createCameraIfMissing = true;
             bootstrap.createLightIfMissing = true;
             bootstrap.createBackendControllerIfMissing = true;
+            bootstrap.createAutoRenderControllerIfMissing = false;
             bootstrap.createCommandWindowIfMissing = true;
             bootstrap.backendBaseUrl = "http://127.0.0.1:8000";
             bootstrap.autoStartBackendOnAwake = true;
-            bootstrap.cameraPosition = new Vector3(0.5f, 0.65f, -4.5f);
-            bootstrap.cameraLookTarget = new Vector3(0.5f, 0.5f, 0.5f);
-            bootstrap.pointSize = 0.15f;
+            bootstrap.renderCachedWorkflowOnStart = false;
+            bootstrap.startupWorkflowId = "test3";
+            bootstrap.startupDataset = "hurricane_sandy_2012_100k_sample.csv";
+            bootstrap.startupViewType = "Point";
+            bootstrap.cameraPosition = new Vector3(0.85f, 0.72f, -1.15f);
+            bootstrap.cameraLookTarget = new Vector3(0f, 0.08f, 0f);
+            bootstrap.pointSize = 0.18f;
             bootstrap.renderLinks = true;
             bootstrap.renderRootLocalPosition = new Vector3(0f, 0f, 0f);
-            bootstrap.renderRootLocalScale = new Vector3(4f, 4f, 4f);
+            bootstrap.renderRootLocalScale = new Vector3(1.85f, 1.85f, 1.85f);
 
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, AgenticScenePath);

@@ -1,4 +1,4 @@
-# EvoVis Studio Backend
+﻿# EvoVis Studio Backend
 
 `EvoVis Studio Backend` is the EvoFlow-side runtime for **natural-language-driven visualization workflow search**.
 
@@ -94,11 +94,23 @@ Install Python dependencies if `.python_deps/` is not already present in your lo
 python3 -m pip install -r requirements.txt -t ./.python_deps
 ```
 
-Dynamic LLM-backed runs require a DashScope API key:
+Dynamic LLM-backed runs use DashScope compatible-mode with `qwen-turbo` by default. They require a DashScope API key:
 
 ```bash
 export DASHSCOPE_API_KEY="..."
+export DASHSCOPE_MODEL="qwen-turbo"
 ```
+
+On Windows PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_sk_api_key", [EnvironmentVariableTarget]::User)
+[Environment]::SetEnvironmentVariable("DASHSCOPE_MODEL", "qwen-turbo", [EnvironmentVariableTarget]::User)
+```
+
+Then restart VS Code, Cursor, Codex terminals, and Unity so child backend processes inherit the new environment.
+
+For local file-based configuration, copy [.env.example](.env.example) to `.env.local` and fill in local values. `.env` and `.env.local` are ignored by git; do not commit real keys.
 
 Use the one-command launcher:
 

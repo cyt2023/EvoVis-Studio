@@ -1,8 +1,11 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OperatorPackage.Core;
 
-namespace OperatorRunner;
+namespace OperatorRunner
+{
 
 public enum RequestKind
 {
@@ -214,153 +217,154 @@ public sealed class SelfEvaluation
 
 public sealed class StandardOperatorEnvelope
 {
-    [JsonPropertyName("workflow_id")]
+    [JsonProperty("workflow_id")]
     public string WorkflowId { get; set; } = "wf_default";
 
-    [JsonPropertyName("operator_id")]
+    [JsonProperty("operator_id")]
     public string OperatorId { get; set; } = "op_001";
 
-    [JsonPropertyName("operator_type")]
+    [JsonProperty("operator_type")]
     public string OperatorType { get; set; } = string.Empty;
 
-    [JsonPropertyName("operator_level")]
+    [JsonProperty("operator_level")]
     public string OperatorLevel { get; set; } = "Level_1";
 
-    [JsonPropertyName("timestamp")]
+    [JsonProperty("timestamp")]
     public string? Timestamp { get; set; }
 
-    [JsonPropertyName("input_data")]
-    public JsonElement InputData { get; set; }
+    [JsonProperty("input_data")]
+    public JObject InputData { get; set; } = new();
 
-    [JsonPropertyName("parameters")]
-    public JsonElement Parameters { get; set; }
+    [JsonProperty("parameters")]
+    public JObject Parameters { get; set; } = new();
 }
 
 public sealed class StandardWorkflowEnvelope
 {
-    [JsonPropertyName("workflow_id")]
+    [JsonProperty("workflow_id")]
     public string WorkflowId { get; set; } = "wf_default";
 
-    [JsonPropertyName("workflow_type")]
+    [JsonProperty("workflow_type")]
     public string WorkflowType { get; set; } = "Workflow";
 
-    [JsonPropertyName("execution_graph")]
+    [JsonProperty("execution_graph")]
     public ExecutionGraph ExecutionGraph { get; set; } = new();
 
-    [JsonPropertyName("input_data")]
-    public JsonElement InputData { get; set; }
+    [JsonProperty("input_data")]
+    public JObject InputData { get; set; } = new();
 
-    [JsonPropertyName("parameters")]
-    public JsonElement Parameters { get; set; }
+    [JsonProperty("parameters")]
+    public JObject Parameters { get; set; } = new();
 }
 
 public sealed class ExecutionGraph
 {
-    [JsonPropertyName("nodes")]
+    [JsonProperty("nodes")]
     public List<ExecutionNode> Nodes { get; set; } = new();
 
-    [JsonPropertyName("edges")]
+    [JsonProperty("edges")]
     public List<ExecutionEdge> Edges { get; set; } = new();
 }
 
 public sealed class ExecutionNode
 {
-    [JsonPropertyName("id")]
+    [JsonProperty("id")]
     public string Id { get; set; } = string.Empty;
 
-    [JsonPropertyName("type")]
+    [JsonProperty("type")]
     public string Type { get; set; } = string.Empty;
 
-    [JsonPropertyName("level")]
+    [JsonProperty("level")]
     public string Level { get; set; } = string.Empty;
 }
 
 public sealed class ExecutionEdge
 {
-    [JsonPropertyName("from")]
+    [JsonProperty("from")]
     public string From { get; set; } = string.Empty;
 
-    [JsonPropertyName("to")]
+    [JsonProperty("to")]
     public string To { get; set; } = string.Empty;
 }
 
 public sealed class UnityExportEnvelope
 {
-    [JsonPropertyName("meta")]
+    [JsonProperty("meta")]
     public ExportMeta Meta { get; set; } = new();
 
-    [JsonPropertyName("task")]
+    [JsonProperty("task")]
     public ExportTask Task { get; set; } = new();
 
-    [JsonPropertyName("selectedWorkflow")]
+    [JsonProperty("selectedWorkflow")]
     public ExportSelectedWorkflow SelectedWorkflow { get; set; } = new();
 }
 
 public sealed class ExportMeta
 {
-    [JsonPropertyName("sourceDataPath")]
+    [JsonProperty("sourceDataPath")]
     public string SourceDataPath { get; set; } = string.Empty;
 
-    [JsonPropertyName("taskId")]
+    [JsonProperty("taskId")]
     public string? TaskId { get; set; }
 }
 
 public sealed class ExportTask
 {
-    [JsonPropertyName("rawText")]
+    [JsonProperty("rawText")]
     public string? RawText { get; set; }
 
-    [JsonPropertyName("parsedSpec")]
+    [JsonProperty("parsedSpec")]
     public ExportParsedSpec ParsedSpec { get; set; } = new();
 }
 
 public sealed class ExportParsedSpec
 {
-    [JsonPropertyName("requiredViewType")]
+    [JsonProperty("requiredViewType")]
     public string? RequiredViewType { get; set; }
 
-    [JsonPropertyName("atomicMode")]
+    [JsonProperty("atomicMode")]
     public AtomicQueryMode AtomicMode { get; set; } = AtomicQueryMode.Origin;
 
-    [JsonPropertyName("requireBackendBuild")]
+    [JsonProperty("requireBackendBuild")]
     public bool RequireBackendBuild { get; set; }
 
-    [JsonPropertyName("mapping")]
+    [JsonProperty("mapping")]
     public MappingRequest? Mapping { get; set; }
 
-    [JsonPropertyName("normalizeColumns")]
+    [JsonProperty("normalizeColumns")]
     public List<string> NormalizeColumns { get; set; } = new();
 
-    [JsonPropertyName("filter")]
+    [JsonProperty("filter")]
     public ExportFilterSpec? Filter { get; set; }
 
-    [JsonPropertyName("timeColumn")]
+    [JsonProperty("timeColumn")]
     public string? TimeColumn { get; set; }
 
-    [JsonPropertyName("encodedTimeColumn")]
+    [JsonProperty("encodedTimeColumn")]
     public string? EncodedTimeColumn { get; set; }
 
-    [JsonPropertyName("spatialRegion")]
+    [JsonProperty("spatialRegion")]
     public SpatialRegionRequest? SpatialRegion { get; set; }
 
-    [JsonPropertyName("timeWindow")]
+    [JsonProperty("timeWindow")]
     public TimeWindowRequest? TimeWindow { get; set; }
 
-    [JsonPropertyName("recurrentHours")]
+    [JsonProperty("recurrentHours")]
     public List<int> RecurrentHours { get; set; } = new();
 }
 
 public sealed class ExportFilterSpec
 {
-    [JsonPropertyName("column")]
+    [JsonProperty("column")]
     public string? Column { get; set; }
 
-    [JsonPropertyName("value")]
+    [JsonProperty("value")]
     public string? Value { get; set; }
 }
 
 public sealed class ExportSelectedWorkflow
 {
-    [JsonPropertyName("operators")]
+    [JsonProperty("operators")]
     public List<string> Operators { get; set; } = new();
+}
 }

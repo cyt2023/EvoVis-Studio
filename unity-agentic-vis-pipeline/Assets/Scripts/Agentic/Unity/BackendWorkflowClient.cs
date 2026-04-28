@@ -30,13 +30,16 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         public string task;
         public string dataset;
         public string workflowId = "test3";
-        public string viewType = "Point";
-        public bool execute = false;
+        public string viewType = "Auto";
+        public bool execute = true;
+        public bool requireLlm = true;
         public string taskId;
         public int population = 6;
         public int generations = 3;
         public int eliteSize = 2;
         public int timeoutSeconds = 180;
+        public int limit = 1000;
+        public bool includeSelectedIds = false;
     }
 
     public class BackendWorkflowClient
@@ -60,10 +63,14 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             yield return GetText("/api/datasets", onComplete);
         }
 
-        public IEnumerator FetchUnityRenderJson(string workflowId, Action<bool, string> onComplete)
+        public IEnumerator FetchUnityRenderJson(string workflowId, Action<bool, string> onComplete, int limit = 1000, bool includeSelectedIds = false)
         {
             var safeWorkflowId = string.IsNullOrWhiteSpace(workflowId) ? "test3" : workflowId.Trim();
-            yield return GetText("/api/render/" + UnityWebRequest.EscapeURL(safeWorkflowId), onComplete);
+            var query = string.Format(
+                "?limit={0}&includeSelectedIds={1}",
+                Mathf.Max(1, limit),
+                includeSelectedIds ? "true" : "false");
+            yield return GetText("/api/render/" + UnityWebRequest.EscapeURL(safeWorkflowId) + query, onComplete);
         }
 
         public IEnumerator FetchRawWorkflowJson(string workflowId, Action<bool, string> onComplete)

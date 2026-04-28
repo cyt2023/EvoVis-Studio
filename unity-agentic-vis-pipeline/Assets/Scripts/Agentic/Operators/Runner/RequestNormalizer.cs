@@ -1,47 +1,50 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using OperatorPackage.Core;
 
-namespace OperatorRunner;
+namespace OperatorRunner
+{
 
 public static class RequestNormalizer
 {
-    public static NormalizedRequest Parse(string json, JsonSerializerOptions options)
+    public static NormalizedRequest Parse(string json)
     {
-        using var document = JsonDocument.Parse(json);
-        var root = document.RootElement;
+        var root = JObject.Parse(json);
 
-        if (root.TryGetProperty("selectedWorkflow", out _))
+        if (root["selectedWorkflow"] != null)
             return new NormalizedRequest
             {
                 RequestKind = RequestKind.UnityExport,
-                Plan = FromUnityExport(json, options)
+                Plan = FromUnityExport(json)
             };
 
-        if (root.TryGetProperty("execution_graph", out _))
+        if (root["execution_graph"] != null)
             return new NormalizedRequest
             {
                 RequestKind = RequestKind.StandardWorkflow,
-                Plan = FromStandardWorkflow(json, options)
+                Plan = FromStandardWorkflow(json)
             };
 
-        if (root.TryGetProperty("operator_type", out _))
+        if (root["operator_type"] != null)
             return new NormalizedRequest
             {
                 RequestKind = RequestKind.StandardOperator,
-                Plan = FromStandardOperator(json, options)
+                Plan = FromStandardOperator(json)
             };
 
         return new NormalizedRequest
         {
             RequestKind = RequestKind.ExecutionPlan,
-            Plan = JsonSerializer.Deserialize<ExecutionPlan>(json, options) ?? new ExecutionPlan()
+            Plan = JsonConvert.DeserializeObject<ExecutionPlan>(json, JsonDefaults.Settings) ?? new ExecutionPlan()
         };
     }
 
-    private static ExecutionPlan FromUnityExport(string json, JsonSerializerOptions options)
+    private static ExecutionPlan FromUnityExport(string json)
     {
-        var export = JsonSerializer.Deserialize<UnityExportEnvelope>(json, options) ?? new UnityExportEnvelope();
+        var export = JsonConvert.DeserializeObject<UnityExportEnvelope>(json, JsonDefaults.Settings) ?? new UnityExportEnvelope();
         return new ExecutionPlan
         {
             WorkflowId = export.Meta.TaskId ?? "wf_unity_export",
@@ -71,9 +74,9 @@ public static class RequestNormalizer
         };
     }
 
-    private static ExecutionPlan FromStandardWorkflow(string json, JsonSerializerOptions options)
+    private static ExecutionPlan FromStandardWorkflow(string json)
     {
-        var workflow = JsonSerializer.Deserialize<StandardWorkflowEnvelope>(json, options) ?? new StandardWorkflowEnvelope();
+        var workflow = JsonConvert.DeserializeObject<StandardWorkflowEnvelope>(json, JsonDefaults.Settings) ?? new StandardWorkflowEnvelope();
         var plan = new ExecutionPlan
         {
             WorkflowId = workflow.WorkflowId,
@@ -85,9 +88,9 @@ public static class RequestNormalizer
         return plan;
     }
 
-    private static ExecutionPlan FromStandardOperator(string json, JsonSerializerOptions options)
+    private static ExecutionPlan FromStandardOperator(string json)
     {
-        var request = JsonSerializer.Deserialize<StandardOperatorEnvelope>(json, options) ?? new StandardOperatorEnvelope();
+        var request = JsonConvert.DeserializeObject<StandardOperatorEnvelope>(json, JsonDefaults.Settings) ?? new StandardOperatorEnvelope();
         var plan = new ExecutionPlan
         {
             WorkflowId = request.WorkflowId,
@@ -99,9 +102,9 @@ public static class RequestNormalizer
         return plan;
     }
 
-    private static void ApplyCommonInputData(ExecutionPlan plan, JsonElement inputData)
+    private static void ApplyCommonInputData(ExecutionPlan plan, JObject inputData)
     {
-        if (inputData.ValueKind != JsonValueKind.Object)
+        if (inputData == null)
             return;
 
         if (TryGetString(inputData, "source_path", out var sourcePath))
@@ -116,49 +119,47 @@ public static class RequestNormalizer
             plan.DataPath = nestedPointer!;
     }
 
-    private static void ApplyCommonParameters(ExecutionPlan plan, JsonElement parameters)
+    private static void ApplyCommonParameters(ExecutionPlan plan, JObject parameters)
     {
-        if (parameters.ValueKind != JsonValueKind.Object)
+        if (parameters == null)
             return;
 
         if (TryGetString(parameters, "required_view_type", out var requiredViewType))
             plan.RequiredViewType = requiredViewType;
-        if (parameters.TryGetProperty("require_backend_build", out var requireBackendBuild) &&
-            requireBackendBuild.ValueKind is JsonValueKind.True or JsonValueKind.False)
-        {
-            plan.RequireBackendBuild = requireBackendBuild.GetBoolean();
-        }
+
+        if (parameters["require_backend_build"] is JValue requireBackendBuild &&
+            requireBackendBuild.Type == JTokenType.Boolean)
+            plan.RequireBackendBuild = requireBackendBuild.Value<bool>();
 
         if (TryGetString(parameters, "time_column", out var timeColumn))
             plan.TimeColumn = timeColumn;
         if (TryGetString(parameters, "output_column", out var outputColumn))
             plan.EncodedTimeColumn = outputColumn;
 
-        if (parameters.TryGetProperty("mapping", out var mappingElement))
-            plan.Mapping = JsonSerializer.Deserialize<MappingRequest>(mappingElement.GetRawText(), JsonDefaults.Options);
+        if (parameters["mapping"] is JObject mappingElement)
+            plan.Mapping = mappingElement.ToObject<MappingRequest>(JsonDefaults.Serializer);
         else
             plan.Mapping = ParseMappingFromFlatParameters(parameters, plan.Mapping);
 
-        if (parameters.TryGetProperty("spatial_region", out var spatialElement))
-            plan.SpatialRegion = JsonSerializer.Deserialize<SpatialRegionRequest>(spatialElement.GetRawText(), JsonDefaults.Options);
+        if (parameters["spatial_region"] is JObject spatialElement)
+            plan.SpatialRegion = spatialElement.ToObject<SpatialRegionRequest>(JsonDefaults.Serializer);
 
-        if (parameters.TryGetProperty("time_window", out var timeWindowElement))
-            plan.TimeWindow = JsonSerializer.Deserialize<TimeWindowRequest>(timeWindowElement.GetRawText(), JsonDefaults.Options);
+        if (parameters["time_window"] is JObject timeWindowElement)
+            plan.TimeWindow = timeWindowElement.ToObject<TimeWindowRequest>(JsonDefaults.Serializer);
 
         if (TryGetString(parameters, "mode", out var atomicMode) &&
             Enum.TryParse<AtomicQueryMode>(atomicMode, true, out var parsedAtomicMode))
             plan.AtomicMode = parsedAtomicMode;
 
-        if (parameters.TryGetProperty("normalize_columns", out var normalizeColumnsElement) &&
-            normalizeColumnsElement.ValueKind == JsonValueKind.Array)
+        if (parameters["normalize_columns"] is JArray normalizeColumnsElement)
         {
-            plan.NormalizeColumns = normalizeColumnsElement.EnumerateArray()
-                .Where(x => x.ValueKind == JsonValueKind.String)
-                .Select(x => x.GetString()!)
+            plan.NormalizeColumns = normalizeColumnsElement
+                .Where(x => x.Type == JTokenType.String)
+                .Select(x => x.Value<string>()!)
                 .ToList();
         }
 
-        if (parameters.TryGetProperty("filter", out var filterElement) && filterElement.ValueKind == JsonValueKind.Object)
+        if (parameters["filter"] is JObject filterElement)
         {
             if (TryGetString(filterElement, "column", out var filterColumn))
                 plan.FilterColumn = filterColumn;
@@ -166,17 +167,16 @@ public static class RequestNormalizer
                 plan.FilterValue = filterValue;
         }
 
-        if (parameters.TryGetProperty("recurrent_hours", out var recurrentHoursElement) &&
-            recurrentHoursElement.ValueKind == JsonValueKind.Array)
+        if (parameters["recurrent_hours"] is JArray recurrentHoursElement)
         {
-            plan.RecurrentHours = recurrentHoursElement.EnumerateArray()
-                .Where(x => x.TryGetInt32(out _))
-                .Select(x => x.GetInt32())
+            plan.RecurrentHours = recurrentHoursElement
+                .Where(x => x.Type == JTokenType.Integer)
+                .Select(x => x.Value<int>())
                 .ToList();
         }
     }
 
-    private static MappingRequest ParseMappingFromFlatParameters(JsonElement parameters, MappingRequest? existing)
+    private static MappingRequest ParseMappingFromFlatParameters(JObject parameters, MappingRequest? existing)
     {
         var mapping = existing ?? new MappingRequest();
         if (TryGetString(parameters, "trip_id_column", out var tripId)) mapping.TripIdColumn = tripId;
@@ -194,8 +194,8 @@ public static class RequestNormalizer
         if (TryGetString(parameters, "time_column", out var t)) mapping.TimeColumn = t;
         if (TryGetString(parameters, "color_column", out var c)) mapping.ColorColumn = c;
         if (TryGetString(parameters, "size_column", out var s)) mapping.SizeColumn = s;
-        if (parameters.TryGetProperty("stc_mode", out var stcMode) && stcMode.ValueKind is JsonValueKind.True or JsonValueKind.False)
-            mapping.IsSTCMode = stcMode.GetBoolean();
+        if (parameters["stc_mode"] is JValue stcMode && stcMode.Type == JTokenType.Boolean)
+            mapping.IsSTCMode = stcMode.Value<bool>();
         return mapping;
     }
 
@@ -261,13 +261,12 @@ public static class RequestNormalizer
         _ => operatorType
     };
 
-    private static bool TryGetString(JsonElement element, string propertyName, out string? value)
+    private static bool TryGetString(JObject element, string propertyName, out string? value)
     {
-        if (element.ValueKind == JsonValueKind.Object &&
-            element.TryGetProperty(propertyName, out var property) &&
-            property.ValueKind == JsonValueKind.String)
+        if (element[propertyName] is JValue property &&
+            property.Type == JTokenType.String)
         {
-            value = property.GetString();
+            value = property.Value<string>();
             return true;
         }
 
@@ -275,16 +274,15 @@ public static class RequestNormalizer
         return false;
     }
 
-    private static bool TryReadPointerFromObject(JsonElement inputData, out string? pointer)
+    private static bool TryReadPointerFromObject(JObject inputData, out string? pointer)
     {
-        if (inputData.TryGetProperty("pointers", out var pointersElement) &&
-            pointersElement.ValueKind == JsonValueKind.Object)
+        if (inputData["pointers"] is JObject pointersElement)
         {
-            foreach (var property in pointersElement.EnumerateObject())
+            foreach (var property in pointersElement.Properties())
             {
-                if (property.Value.ValueKind == JsonValueKind.String)
+                if (property.Value.Type == JTokenType.String)
                 {
-                    pointer = property.Value.GetString();
+                    pointer = property.Value.Value<string>();
                     return !string.IsNullOrWhiteSpace(pointer);
                 }
             }
@@ -297,11 +295,13 @@ public static class RequestNormalizer
 
 public static class JsonDefaults
 {
-    public static JsonSerializerOptions Options => new()
+    public static JsonSerializerSettings Settings => new()
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true,
-        Converters = { new JsonStringEnumConverter() }
+        Formatting = Formatting.Indented,
+        MissingMemberHandling = MissingMemberHandling.Ignore,
+        NullValueHandling = NullValueHandling.Ignore
     };
+
+    public static JsonSerializer Serializer => JsonSerializer.Create(Settings);
+}
 }

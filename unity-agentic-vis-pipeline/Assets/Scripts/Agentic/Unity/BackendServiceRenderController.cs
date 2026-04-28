@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO;
 using ImmersiveTaxiVis.Integration.Models;
 using UnityEngine;
 
@@ -9,7 +10,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         [Header("Backend Service")]
         public string backendBaseUrl = "http://127.0.0.1:8000";
         public string workflowId = "test3";
-        public int requestTimeoutSeconds = 30;
+        public int requestTimeoutSeconds = 180;
         public bool checkHealthBeforeRender = true;
         public bool renderOnStart = true;
         public bool useRunEndpoint = false;
@@ -18,19 +19,27 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
         [Header("Task Request")]
         [TextArea(2, 4)]
-        public string taskText = "Find concentrated morning pickup hotspots in the Hurricane Sandy sample.";
-        public string dataset = "hurricane_sandy_2012_100k_sample.csv";
+        public string taskText = "Show all NYC taxi pickup points as a dense 3D point cloud. Do not filter rows. Use pickup location on the ground plane and trip distance or fare as visual height or color.";
+        public string dataset = "first_week_of_may_2011_10k_sample.csv";
         public string requestedViewType = "Point";
+        public bool requireRealLlm = true;
+        public int population = 1;
+        public int generations = 0;
+        public int eliteSize = 1;
 
         [Header("Rendering")]
         public Transform renderRoot;
-        public float pointSize = 0.1f;
+        public float pointSize = 0.045f;
         public bool renderLinks = true;
         public Vector3 renderRootLocalPosition = Vector3.zero;
         public Vector3 renderRootLocalScale = Vector3.one;
+        public int renderPointLimit = 1000;
+        public bool includeSelectedIds = false;
 
         [Header("Debug")]
         public bool verboseLogging = true;
+        public bool saveLastResponseJson = true;
+        public string lastResponseFileName = "evoflow-last-render.json";
 
         private BackendWorkflowClient client;
         private WorkflowRuntimeRenderCoordinator renderCoordinator;
@@ -51,6 +60,11 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 StartCoroutine(RequestAndRender());
         }
 
+        public void RequestAndRenderNow()
+        {
+            StartCoroutine(RequestAndRender());
+        }
+
         [ContextMenu("Request Backend And Render")]
         public void RequestAndRenderFromContextMenu()
         {
@@ -66,8 +80,11 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             renderCoordinator.ClearRenderedViews();
         }
 
-        private IEnumerator RequestAndRender()
+        public IEnumerator RequestAndRender()
         {
+            if (verboseLogging)
+                Debug.Log("BackendServiceRenderController: starting EvoFlow request/render coroutine.");
+
             EnsureRenderRoot();
             ConfigureRenderRootTransform();
             RebuildCoordinator();
@@ -85,6 +102,9 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
             if (checkHealthBeforeRender)
             {
+                if (verboseLogging)
+                    Debug.Log("Checking EvoFlow backend health at " + backendBaseUrl + "/api/health");
+
                 var healthOk = false;
                 var healthMessage = string.Empty;
                 yield return client.CheckHealth((ok, message) =>
@@ -108,12 +128,23 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
             if (useRunEndpoint)
             {
+                if (verboseLogging)
+                    Debug.Log("Requesting EvoFlow dynamic render JSON from " + backendBaseUrl + "/api/render/run");
+
                 var runRequest = new BackendWorkflowRunRequest
                 {
                     task = taskText,
                     dataset = dataset,
                     workflowId = workflowId,
-                    viewType = requestedViewType
+                    viewType = requestedViewType,
+                    execute = true,
+                    requireLlm = requireRealLlm,
+                    population = population,
+                    generations = generations,
+                    eliteSize = eliteSize,
+                    timeoutSeconds = requestTimeoutSeconds,
+                    limit = renderPointLimit,
+                    includeSelectedIds = includeSelectedIds
                 };
 
                 yield return client.RunWorkflowForUnityRender(runRequest, (ok, message) =>
@@ -124,11 +155,14 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             }
             else
             {
+                if (verboseLogging)
+                    Debug.Log("Requesting cached EvoFlow render JSON: " + backendBaseUrl + "/api/render/" + workflowId + "?limit=" + renderPointLimit);
+
                 yield return client.FetchUnityRenderJson(workflowId, (ok, message) =>
                 {
                     fetchOk = ok;
                     responseJson = message;
-                });
+                }, renderPointLimit, includeSelectedIds);
             }
 
             if (!fetchOk)
@@ -137,7 +171,29 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 yield break;
             }
 
+            PersistLastResponseJson(responseJson);
             RenderBackendJson(responseJson);
+        }
+
+        private void PersistLastResponseJson(string responseJson)
+        {
+            if (verboseLogging)
+                Debug.Log("Fetched EvoFlow render JSON from " + backendBaseUrl + " for workflow '" + workflowId + "'. Bytes: " + responseJson.Length);
+
+            if (!saveLastResponseJson || string.IsNullOrWhiteSpace(responseJson))
+                return;
+
+            try
+            {
+                var fileName = string.IsNullOrWhiteSpace(lastResponseFileName) ? "evoflow-last-render.json" : lastResponseFileName;
+                var outputPath = Path.Combine(Application.persistentDataPath, fileName);
+                File.WriteAllText(outputPath, responseJson);
+                Debug.Log("Saved latest EvoFlow render JSON to: " + outputPath);
+            }
+            catch (IOException ex)
+            {
+                Debug.LogWarning("Failed to save latest EvoFlow render JSON: " + ex.Message);
+            }
         }
 
         private void RenderBackendJson(string responseJson)

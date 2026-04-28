@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net.Sockets;
 using UnityEngine;
 using UnityEngine.Networking;
 using Debug = UnityEngine.Debug;
@@ -98,14 +99,17 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             if (backendProcess != null && !IsProcessAlive(backendProcess))
                 backendProcess = null;
 
-            var healthOk = false;
-            yield return CheckHealth((ok, _) => healthOk = ok, true);
-            if (healthOk)
+            if (IsBackendPortOpen())
             {
-                isHealthy = true;
-                lastStatusMessage = "Backend already available.";
-                isStarting = false;
-                yield break;
+                var healthOk = false;
+                yield return CheckHealth((ok, _) => healthOk = ok, true);
+                if (healthOk)
+                {
+                    isHealthy = true;
+                    lastStatusMessage = "Backend already available.";
+                    isStarting = false;
+                    yield break;
+                }
             }
 
             if (!OwnsRunningProcess)
@@ -129,6 +133,12 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                     backendProcess = null;
                     isStarting = false;
                     yield break;
+                }
+
+                if (!IsBackendPortOpen())
+                {
+                    yield return new WaitForSecondsRealtime(Mathf.Max(0.1f, healthPollIntervalSeconds));
+                    continue;
                 }
 
                 var ready = false;
@@ -238,13 +248,19 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         {
             var isWindows = Application.platform == RuntimePlatform.WindowsEditor || Application.platform == RuntimePlatform.WindowsPlayer;
             var launcherPath = Path.Combine(backendRoot, isWindows ? windowsLauncherRelativePath : unixLauncherRelativePath);
+            var packagedBackendExe = Path.Combine(backendRoot, "EvoFlowBackend.exe");
             var serverPath = Path.Combine(backendRoot, serverScriptRelativePath);
             var arguments = string.Format("--host {0} --port {1}", backendHost, backendPort);
 
             string fileName;
             string argumentString;
 
-            if (preferLauncherScript && File.Exists(launcherPath))
+            if (isWindows && File.Exists(packagedBackendExe))
+            {
+                fileName = packagedBackendExe;
+                argumentString = arguments;
+            }
+            else if (preferLauncherScript && File.Exists(launcherPath))
             {
                 if (isWindows)
                 {
@@ -357,6 +373,27 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 var responseText = request.downloadHandler != null ? request.downloadHandler.text : string.Empty;
                 isHealthy = true;
                 onComplete?.Invoke(true, responseText);
+            }
+        }
+
+        private bool IsBackendPortOpen()
+        {
+            try
+            {
+                using (var client = new TcpClient())
+                {
+                    var result = client.BeginConnect(backendHost, backendPort, null, null);
+                    var connected = result.AsyncWaitHandle.WaitOne(150);
+                    if (!connected)
+                        return false;
+
+                    client.EndConnect(result);
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
 

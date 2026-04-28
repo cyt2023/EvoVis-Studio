@@ -1,0 +1,11 @@
+.env
+.env.local
+OperatorsDraft/.env
+OperatorsDraft/.env.local
+unity-agentic-vis-pipeline/Assets/StreamingAssets/EvoFlowBackend/
+OperatorsDraft/build/
+OperatorsDraft/dist/
+OperatorsDraft/OperatorRunnerPublished/
+OperatorsDraft/*.spec
+OperatorsDraft/**/__pycache__/
+OperatorsDraft/**/*.py[cod]

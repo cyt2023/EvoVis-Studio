@@ -18,7 +18,7 @@ namespace OperatorPackage.Query
             query.Parameters["Shape"] = Shape;
             query.Parameters["Region"] = input;
 
-            if (input is ValueTuple<float, float, float, float, float, float> region)
+            if (input is System.ValueTuple<float, float, float, float, float, float> region)
             {
                 var (x0, y0, z0, x1, y1, z1) = region;
                 query.SpatialRegion = new SpatialRegion3D

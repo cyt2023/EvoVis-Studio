@@ -73,6 +73,8 @@ namespace ImmersiveTaxiVis.Integration.Models
         public float y;
         public float z;
         public float time;
+        public float colorValue;
+        public float sizeValue;
         public bool isSelected;
     }
 

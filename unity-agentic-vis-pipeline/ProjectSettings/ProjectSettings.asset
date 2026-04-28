@@ -380,9 +380,8 @@ PlayerSettings:
   - {fileID: 0}
   - {fileID: 0}
   - {fileID: 0}
-  - {fileID: 11400000, guid: ab6a04734a5f58744be03dd606c1a25f, type: 2}
-  - {fileID: 8216995085943143313, guid: b19feb46fbc4c2942aa0e3b9cedcebcb, type: 2}
-  - {fileID: 4742728883483131434, guid: ec98785d0e88fb64b88e6a5c8b0884f8, type: 2}
+  - {fileID: 0}
+  - {fileID: 0}
   - {fileID: 0}
   metroInputSource: 0
   wsaTransparentSwapchain: 0
@@ -1064,4 +1063,4 @@ PlayerSettings:
   playerDataPath: 
   forceSRGBBlit: 1
   virtualTexturingSupportEnabled: 0
-  insecureHttpOption: 0
+  insecureHttpOption: 2

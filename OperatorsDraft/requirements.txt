@@ -1,1 +1,1 @@
-dashscope>=1.25,<2
+# Aliyun Bailian App API is called through Python standard-library HTTP.

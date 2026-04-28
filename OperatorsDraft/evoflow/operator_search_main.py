@@ -5,7 +5,9 @@ import json
 import os
 import random
 import re
+import shutil
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
@@ -15,10 +17,28 @@ from typing import Any, Optional, Union
 from real_llm import run_qwen_llm
 
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
 RUNNER_PROJECT = ROOT / "OperatorRunner" / "OperatorRunner.csproj"
-RUNNER_DLL = ROOT / "OperatorRunner" / "bin" / "Debug" / "net8.0" / "OperatorRunner.dll"
-DOTNET_PATH = ROOT / ".dotnet" / "dotnet"
+RUNNER_BUILD_ROOT = ROOT / ".build" / "OperatorRunner"
+RUNNER_DLL = RUNNER_BUILD_ROOT / "bin" / "Debug" / "net7.0" / "OperatorRunner.dll"
+RUNNER_EXE = ROOT / "OperatorRunnerPublished" / "OperatorRunner.exe"
+
+
+def resolve_dotnet_path() -> Path:
+    local_names = ["dotnet.exe", "dotnet"] if os.name == "nt" else ["dotnet", "dotnet.exe"]
+    for name in local_names:
+        candidate = ROOT / ".dotnet" / name
+        if candidate.exists():
+            return candidate
+
+    system_dotnet = shutil.which("dotnet")
+    if system_dotnet:
+        return Path(system_dotnet)
+
+    return ROOT / ".dotnet" / local_names[0]
+
+
+DOTNET_PATH = resolve_dotnet_path()
 
 POPULATION_SIZE = 12
 GENERATIONS = 8
@@ -26,13 +46,15 @@ ELITE_SIZE = 4
 MUTATION_RATE = 0.25
 RANDOM_SEED = 7
 VERBOSE = True
-TASK_PARSE_TIMEOUT_SECONDS = 10
-DATASET_SCHEMA_TIMEOUT_SECONDS = 10
+TASK_PARSE_TIMEOUT_SECONDS = 60
+DATASET_SCHEMA_TIMEOUT_SECONDS = 60
 WORKFLOW_EVAL_TIMEOUT_SECONDS = 30
 LLM_RETRY_ATTEMPTS = 3
 EXPORT_SCHEMA_VERSION = "2.0.0"
 LOG_LIST_SAMPLE_SIZE = 8
 LOG_TEXT_PREVIEW = 1200
+REQUIRE_LLM = False
+LLM_SUCCESS_COUNT = 0
 
 
 @dataclass
@@ -520,20 +542,32 @@ def default_atomic_mode(description: str) -> str:
 
 def infer_task_hints(description: str) -> dict:
     lower = description.lower()
+    disable_filters = any(
+        token in lower
+        for token in (
+            "do not filter",
+            "don't filter",
+            "no filter",
+            "without filtering",
+            "show all",
+            "render all",
+        )
+    )
     require_backend = any(token in lower for token in ("backend", "render", "display", "visualization", "view"))
     require_temporal = any(
         token in lower
         for token in ("temporal", "time", "morning", "rush", "hour", "peak", "daily", "weekly", "monthly")
-    )
+    ) and not disable_filters
     require_spatial = any(
         token in lower
         for token in ("spatial", "origin", "destination", "pickup", "dropoff", "region", "location", "hotspot")
-    )
+    ) and not disable_filters
     hotspot_focus = any(token in lower for token in ("hotspot", "cluster", "focus", "concentrat", "peak"))
     return {
         "requireBackendBuild": require_backend,
         "requireTemporalFilter": require_temporal,
         "requireSpatialFilter": require_spatial,
+        "disableFilters": disable_filters,
         "hotspotFocus": hotspot_focus,
     }
 
@@ -641,6 +675,7 @@ def call_llm_with_timeout(
     label: str,
     retries: int = 1,
 ):
+    global LLM_SUCCESS_COUNT
     last_answer = None
     for attempt in range(1, retries + 1):
         if retries > 1:
@@ -660,6 +695,8 @@ def call_llm_with_timeout(
             executor.shutdown(wait=False, cancel_futures=True)
 
         if answer and answer.strip().upper() != "ERROR":
+            LLM_SUCCESS_COUNT += 1
+            log(f"[{label}] Real LLM response received.")
             return answer
 
         log(f"[{label}] Request failed on attempt {attempt}/{retries}.")
@@ -667,6 +704,10 @@ def call_llm_with_timeout(
 
 
 def ensure_runner_ready() -> None:
+    if RUNNER_EXE.exists():
+        log(f"[Setup] Using packaged C# operator runner: {RUNNER_EXE}")
+        return
+
     if not DOTNET_PATH.exists():
         raise RuntimeError(
             f"Missing dotnet at {DOTNET_PATH}. Install .NET SDK into the project-local .dotnet folder first."
@@ -674,11 +715,21 @@ def ensure_runner_ready() -> None:
 
     env = dotnet_env()
     log("[Setup] Checking and building C# operator runner...")
+    RUNNER_BUILD_ROOT.mkdir(parents=True, exist_ok=True)
     subprocess.run(
-        [str(DOTNET_PATH), "build", str(RUNNER_PROJECT), "-p:UseAppHost=false"],
+        [
+            str(DOTNET_PATH),
+            "build",
+            str(RUNNER_PROJECT),
+            "-p:UseAppHost=false",
+            f"-p:BaseIntermediateOutputPath={(RUNNER_BUILD_ROOT / 'obj').as_posix()}/",
+            f"-p:BaseOutputPath={(RUNNER_BUILD_ROOT / 'bin').as_posix()}/",
+        ],
         check=True,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         env=env,
     )
     if not RUNNER_DLL.exists():
@@ -690,7 +741,7 @@ def dotnet_env() -> dict:
     env = os.environ.copy()
     env["HOME"] = str(ROOT)
     env["DOTNET_CLI_HOME"] = str(ROOT)
-    env["PATH"] = f"{DOTNET_PATH.parent}:{env.get('PATH', '')}"
+    env["PATH"] = f"{DOTNET_PATH.parent}{os.pathsep}{env.get('PATH', '')}"
     return env
 
 
@@ -803,6 +854,11 @@ Task description:
     )
 
     if not answer or answer.strip().upper() == "ERROR":
+        if REQUIRE_LLM:
+            raise RuntimeError(
+                "LLM is required, but task parsing did not receive a real LLM response. "
+                "Set DASHSCOPE_API_KEY before running."
+            )
         log("[Task Parse] LLM parsing failed. Falling back to heuristic task spec.")
         task = fallback_task_spec(description, profile)
         TASK_PARSE_CACHE[cache_key] = task
@@ -813,6 +869,8 @@ Task description:
     log_text_block("\n=== Step 3: LLM Task Parsing Raw Response ===", answer)
     match = re.search(r"\{.*\}", answer, flags=re.DOTALL)
     if not match:
+        if REQUIRE_LLM:
+            raise RuntimeError("LLM is required, but task parsing response did not contain valid JSON.")
         log("[Task Parse] No JSON found in LLM output. Falling back to heuristic task spec.")
         task = fallback_task_spec(description, profile)
         TASK_PARSE_CACHE[cache_key] = task
@@ -822,6 +880,8 @@ Task description:
     try:
         parsed = json.loads(match.group(0))
     except json.JSONDecodeError:
+        if REQUIRE_LLM:
+            raise RuntimeError("LLM is required, but task parsing JSON could not be decoded.")
         log("[Task Parse] JSON decoding failed. Falling back to heuristic task spec.")
         task = fallback_task_spec(description, profile)
         TASK_PARSE_CACHE[cache_key] = task
@@ -879,7 +939,9 @@ def build_workflow(candidate: Candidate) -> list[str]:
 
     workflow = ["ReadDataOperator"]
 
-    if "FilterRowsOperator" in chosen:
+    filters_disabled = bool(task_hints.get("disableFilters"))
+
+    if "FilterRowsOperator" in chosen and not filters_disabled and TASK.request.get("filterColumn"):
         workflow.append("FilterRowsOperator")
     if "NormalizeAttributesOperator" in chosen:
         workflow.append("NormalizeAttributesOperator")
@@ -896,7 +958,7 @@ def build_workflow(candidate: Candidate) -> list[str]:
         view_op = preferred_view
     workflow.append(view_op)
 
-    query_ops = [op for op in (
+    query_ops = [] if filters_disabled else [op for op in (
         "CreateAtomicQueryOperator",
         "CreateDirectionalQueryOperator",
         "RecurrentQueryComposeOperator",
@@ -912,14 +974,17 @@ def build_workflow(candidate: Candidate) -> list[str]:
 
     workflow.extend(query_ops)
 
-    filter_ops = [op for op in ("ApplySpatialFilterOperator", "ApplyTemporalFilterOperator") if op in chosen]
-    if task_hints.get("requireSpatialFilter") and "ApplySpatialFilterOperator" not in filter_ops:
-        filter_ops.append("ApplySpatialFilterOperator")
-    if task_hints.get("requireTemporalFilter") and TASK.request.get("timeColumn") and "ApplyTemporalFilterOperator" not in filter_ops:
-        filter_ops.append("ApplyTemporalFilterOperator")
-    if "ApplySpatialFilterOperator" in filter_ops and "CreateAtomicQueryOperator" not in workflow:
-        workflow.insert(workflow.index(view_op) + 1, "CreateAtomicQueryOperator")
-    workflow.extend(filter_ops)
+    if filters_disabled:
+        filter_ops = []
+    else:
+        filter_ops = [op for op in ("ApplySpatialFilterOperator", "ApplyTemporalFilterOperator") if op in chosen]
+        if task_hints.get("requireSpatialFilter") and "ApplySpatialFilterOperator" not in filter_ops:
+            filter_ops.append("ApplySpatialFilterOperator")
+        if task_hints.get("requireTemporalFilter") and TASK.request.get("timeColumn") and "ApplyTemporalFilterOperator" not in filter_ops:
+            filter_ops.append("ApplyTemporalFilterOperator")
+        if "ApplySpatialFilterOperator" in filter_ops and "CreateAtomicQueryOperator" not in workflow:
+            workflow.insert(workflow.index(view_op) + 1, "CreateAtomicQueryOperator")
+        workflow.extend(filter_ops)
 
     if "CombineFiltersOperator" in chosen and all(op in workflow for op in ("ApplySpatialFilterOperator", "ApplyTemporalFilterOperator")):
         workflow.append("CombineFiltersOperator")
@@ -998,16 +1063,19 @@ def run_workflow(workflow: list[str]) -> dict:
         request_path = handle.name
 
     try:
+        runner_command = [str(RUNNER_EXE), "--request", request_path] if RUNNER_EXE.exists() else [
+            str(DOTNET_PATH),
+            str(RUNNER_DLL),
+            "--request",
+            request_path,
+        ]
         completed = subprocess.run(
-            [
-                str(DOTNET_PATH),
-                str(RUNNER_DLL),
-                "--request",
-                request_path,
-            ],
+            runner_command,
             check=True,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             env=env,
         )
         response = json.loads(completed.stdout)
@@ -1535,7 +1603,7 @@ def print_result(best: Candidate) -> None:
 
 
 def main() -> None:
-    global TASK, DATASET_PROFILE, POPULATION_SIZE, GENERATIONS, ELITE_SIZE
+    global TASK, DATASET_PROFILE, POPULATION_SIZE, GENERATIONS, ELITE_SIZE, REQUIRE_LLM, LLM_SUCCESS_COUNT
 
     parser = argparse.ArgumentParser(description="Run EvoFlow operator search from a terminal task description.")
     parser.add_argument("--task", help="Task description to run. If omitted, the program prompts in the terminal.")
@@ -1553,7 +1621,10 @@ def main() -> None:
     parser.add_argument("--population", type=int, default=POPULATION_SIZE, help="Population size for EvoFlow search.")
     parser.add_argument("--generations", type=int, default=GENERATIONS, help="Number of generations to evolve.")
     parser.add_argument("--elite-size", type=int, default=ELITE_SIZE, help="How many elite workflows survive each generation.")
+    parser.add_argument("--require-llm", action="store_true", help="Fail instead of using heuristic fallbacks unless at least one real LLM response is received.")
     args = parser.parse_args()
+    REQUIRE_LLM = args.require_llm
+    LLM_SUCCESS_COUNT = 0
 
     description = args.task
     if not description:
@@ -1576,6 +1647,8 @@ def main() -> None:
     TASK_PARSE_CACHE.clear()
     ensure_runner_ready()
     ranked = evolve()
+    if REQUIRE_LLM and LLM_SUCCESS_COUNT <= 0:
+        raise RuntimeError("LLM is required, but no real LLM response was received during EvoFlow execution.")
     best = ranked[0]
     export_unity_json(TASK, best, args.export_json, task_id=args.task_id)
     print_result(best)

@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using ImmersiveTaxiVis.Integration.Models;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 
 namespace ImmersiveTaxiVis.Integration.Runtime
 {
@@ -16,36 +18,46 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
         [Header("Command")]
         [TextArea(3, 6)]
-        public string commandText = "Find concentrated morning pickup hotspots in the Hurricane Sandy sample and render them as a backend-ready point visualization.";
-        public string dataset = "hurricane_sandy_2012_100k_sample.csv";
+        public string commandText = "Show all NYC taxi pickup points as a dense 3D point cloud. Do not filter rows. Use pickup location on the ground plane and trip distance or fare as visual height or color.";
+        public string dataset = "first_week_of_may_2011_10k_sample.csv";
         public string workflowId = "test3";
-        public string requestedViewType = "Point";
-        public bool executeEvoFlow = false;
-        public int population = 6;
-        public int generations = 3;
-        public int eliteSize = 2;
+        public string requestedViewType = "Auto";
+        public bool executeEvoFlow = true;
+        public bool requireRealLlm = true;
+        public int population = 1;
+        public int generations = 0;
+        public int eliteSize = 1;
 
         [Header("Rendering")]
         public Transform renderRoot;
-        public float pointSize = 0.1f;
+        public float pointSize = 0.045f;
         public bool renderLinks = true;
         public Vector3 renderRootLocalPosition = Vector3.zero;
         public Vector3 renderRootLocalScale = Vector3.one;
+        public int renderPointLimit = 1000;
 
         [Header("Window")]
         public bool showWindow = true;
-        public Rect windowRect = new Rect(20, 20, 620, 420);
+        public bool useCanvasUi = true;
+        public bool hideWindowAfterRender = true;
+        public bool loadDatasetsOnStart = true;
+        public Rect windowRect = new Rect(20, 20, 760, 560);
 
         private BackendWorkflowClient client;
         private WorkflowRuntimeRenderCoordinator renderCoordinator;
         private Transform configuredRenderRoot;
         private float configuredPointSize = -1f;
         private bool configuredRenderLinks;
-        private string statusMessage = "Ready.";
+        private string statusMessage = "Ready. Edit the task and click Run And Render.";
         private bool isRunning;
         private Vector2 scroll;
         private BackendDatasetInfo[] datasets = new BackendDatasetInfo[0];
         private string datasetStatus = "Datasets not loaded.";
+        private InputField taskInputField;
+        private Text statusText;
+        private Text backendText;
+        private Text datasetText;
+        private GameObject canvasRoot;
 
         private void Awake()
         {
@@ -57,20 +69,70 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             RebuildCoordinator();
         }
 
-        private void OnGUI()
+        private void Start()
         {
-            if (!showWindow)
+            if (useCanvasUi)
+                BuildCanvasUi();
+
+            if (loadDatasetsOnStart && !isRunning)
+                StartCoroutine(LoadDatasets());
+        }
+
+        private void Update()
+        {
+            if (Input.GetKeyDown(KeyCode.Tab))
+            {
+                showWindow = !showWindow;
+                if (canvasRoot != null)
+                    canvasRoot.SetActive(showWindow);
+            }
+
+            if (!useCanvasUi)
                 return;
 
-            windowRect = GUI.Window(GetInstanceID(), windowRect, DrawWindow, "EvoFlow Command");
+            if (taskInputField != null && !taskInputField.isFocused)
+                taskInputField.text = commandText;
+
+            if (statusText != null)
+                statusText.text = "Status: " + statusMessage;
+
+            if (backendText != null)
+            {
+                var backendStatus = backendServiceController != null ? backendServiceController.StatusMessage : "No backend controller.";
+                backendText.text = "Backend: " + backendStatus + "    Endpoint: " + backendBaseUrl;
+            }
+
+            if (datasetText != null)
+                datasetText.text = "Dataset: " + dataset + "    " + datasetStatus;
+        }
+
+        private void OnGUI()
+        {
+            if (!showWindow || useCanvasUi)
+                return;
+
+            windowRect.width = Mathf.Min(windowRect.width, Screen.width - 40);
+            windowRect.height = Mathf.Min(windowRect.height, Screen.height - 40);
+            windowRect = GUI.Window(GetInstanceID(), windowRect, DrawWindow, "EvoVis Studio");
         }
 
         private void DrawWindow(int id)
         {
             GUILayout.Label("Task command / 任务命令");
-            scroll = GUILayout.BeginScrollView(scroll, GUILayout.Height(90));
-            commandText = GUILayout.TextArea(commandText, GUILayout.ExpandHeight(true));
-            GUILayout.EndScrollView();
+            GUILayout.Label("Describe the visualization task");
+            GUI.SetNextControlName("TaskCommandTextArea");
+            commandText = GUILayout.TextArea(commandText, GUILayout.Height(120));
+
+            GUILayout.BeginHorizontal();
+            GUI.enabled = !isRunning;
+            if (GUILayout.Button(isRunning ? "Running..." : "Run And Render", GUILayout.Height(38)))
+                StartCoroutine(RunCommandAndRender());
+            if (GUILayout.Button("Clear View", GUILayout.Width(110), GUILayout.Height(38)))
+                ClearRender();
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label("Status: " + statusMessage);
 
             if (backendServiceController != null)
             {
@@ -90,14 +152,14 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                     backendServiceController.StopOwnedBackendProcess();
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
-                GUILayout.Label("Layout Hint: " + backendServiceController.ResolutionHint);
+                GUILayout.Label("Backend layout: " + backendServiceController.ResolutionHint);
             }
 
             GUILayout.BeginHorizontal();
             GUILayout.Label("Dataset", GUILayout.Width(70));
             dataset = GUILayout.TextField(dataset);
             GUI.enabled = !isRunning;
-            if (GUILayout.Button("Load", GUILayout.Width(60)))
+            if (GUILayout.Button("Refresh", GUILayout.Width(80)))
                 StartCoroutine(LoadDatasets());
             GUI.enabled = true;
             GUILayout.EndHorizontal();
@@ -121,13 +183,13 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             workflowId = GUILayout.TextField(workflowId, GUILayout.Width(120));
             GUILayout.Label("View", GUILayout.Width(40));
             requestedViewType = GUILayout.TextField(requestedViewType, GUILayout.Width(80));
-            executeEvoFlow = GUILayout.Toggle(executeEvoFlow, "Execute EvoFlow");
+            executeEvoFlow = GUILayout.Toggle(executeEvoFlow, "Generate new workflow");
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Preset: Cached test3", GUILayout.Height(24)))
+            if (GUILayout.Button("Use cached sample", GUILayout.Height(24)))
                 ApplyCachedPreset();
-            if (GUILayout.Button("Preset: Dynamic Point", GUILayout.Height(24)))
+            if (GUILayout.Button("Use dynamic point task", GUILayout.Height(24)))
                 ApplyDynamicPointPreset();
             GUILayout.EndHorizontal();
 
@@ -140,18 +202,181 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             eliteSize = ParseIntField(eliteSize, GUILayout.Width(50));
             GUILayout.EndHorizontal();
 
-            GUILayout.BeginHorizontal();
-            GUI.enabled = !isRunning;
-            if (GUILayout.Button("Run And Render", GUILayout.Height(32)))
-                StartCoroutine(RunCommandAndRender());
-            if (GUILayout.Button("Clear", GUILayout.Width(90), GUILayout.Height(32)))
-                ClearRender();
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-
-            GUILayout.Label("Status: " + statusMessage);
             GUILayout.Label("Dataset status: " + datasetStatus);
-            GUI.DragWindow();
+            GUI.DragWindow(new Rect(0, 0, windowRect.width, 22));
+        }
+
+        private void BuildCanvasUi()
+        {
+            if (taskInputField != null)
+                return;
+
+            EnsureEventSystem();
+
+            canvasRoot = new GameObject("EvoVisStudioCanvas");
+            canvasRoot.transform.SetParent(transform, false);
+            var canvas = canvasRoot.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = 100;
+            canvasRoot.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            canvasRoot.AddComponent<GraphicRaycaster>();
+
+            var panel = CreateUiObject<RectTransform>("Panel", canvasRoot.transform);
+            panel.anchorMin = new Vector2(0.02f, 0.05f);
+            panel.anchorMax = new Vector2(0.58f, 0.95f);
+            panel.offsetMin = Vector2.zero;
+            panel.offsetMax = Vector2.zero;
+            var panelImage = panel.gameObject.AddComponent<Image>();
+            panelImage.color = new Color(0.08f, 0.09f, 0.11f, 0.94f);
+            panelImage.raycastTarget = false;
+
+            CreateLabel(panel, "Title", "EvoVis Studio", 18, new Vector2(16, -14), new Vector2(-16, -40), TextAnchor.MiddleLeft);
+            CreateLabel(panel, "TaskLabel", "Describe the visualization task", 14, new Vector2(16, -48), new Vector2(-16, -72), TextAnchor.MiddleLeft);
+
+            taskInputField = CreateInputField(panel, "TaskInput", commandText, new Vector2(16, -76), new Vector2(-16, -216));
+            taskInputField.onValueChanged.AddListener(value => commandText = value);
+
+            var runButton = CreateButton(panel, "RunButton", "Run And Render", new Vector2(16, -226), new Vector2(-16, -266));
+            runButton.onClick.AddListener(() =>
+            {
+                Debug.Log("EvoVis canvas UI: Run And Render clicked.");
+                if (!isRunning)
+                    StartCoroutine(RunCommandAndRender());
+            });
+
+            var clearButton = CreateButton(panel, "ClearButton", "Clear View", new Vector2(16, -272), new Vector2(-16, -312));
+            clearButton.onClick.AddListener(ClearRender);
+
+            statusText = CreateLabel(panel, "Status", "Status: " + statusMessage, 13, new Vector2(16, -326), new Vector2(-16, -352), TextAnchor.MiddleLeft);
+            backendText = CreateLabel(panel, "Backend", "Backend: " + backendBaseUrl, 13, new Vector2(16, -354), new Vector2(-16, -380), TextAnchor.MiddleLeft);
+            datasetText = CreateLabel(panel, "Dataset", "Dataset: " + dataset, 13, new Vector2(16, -382), new Vector2(-16, -408), TextAnchor.MiddleLeft);
+
+            CreateLabel(panel, "DatasetFieldLabel", "Dataset", 13, new Vector2(16, -420), new Vector2(82, -446), TextAnchor.MiddleLeft);
+            var datasetInput = CreateInputField(panel, "DatasetInput", dataset, new Vector2(88, -418), new Vector2(-126, -450));
+            datasetInput.onValueChanged.AddListener(value => dataset = value);
+
+            var refreshButton = CreateButton(panel, "RefreshButton", "Refresh", new Vector2(16, -456), new Vector2(-16, -492));
+            refreshButton.onClick.AddListener(() =>
+            {
+                if (!isRunning)
+                    StartCoroutine(LoadDatasets());
+            });
+
+            var cachedButton = CreateButton(panel, "CachedButton", "Use cached sample", new Vector2(16, -498), new Vector2(-16, -534));
+            cachedButton.onClick.AddListener(() =>
+            {
+                ApplyCachedPreset();
+                if (taskInputField != null)
+                    taskInputField.text = commandText;
+            });
+        }
+
+        private static void EnsureEventSystem()
+        {
+            if (FindObjectOfType<EventSystem>() != null)
+                return;
+
+            var eventSystem = new GameObject("EventSystem");
+            eventSystem.AddComponent<EventSystem>();
+            eventSystem.AddComponent<StandaloneInputModule>();
+        }
+
+        private static T CreateUiObject<T>(string name, Transform parent) where T : Component
+        {
+            var gameObject = new GameObject(name);
+            gameObject.transform.SetParent(parent, false);
+            return gameObject.AddComponent<T>();
+        }
+
+        private static Text CreateLabel(RectTransform parent, string name, string value, int fontSize, Vector2 offsetMin, Vector2 offsetMax, TextAnchor alignment)
+        {
+            var text = CreateUiObject<Text>(name, parent);
+            var rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(1, 1);
+            NormalizeTopAnchoredOffsets(ref offsetMin, ref offsetMax);
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+            text.text = value;
+            text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+            text.fontSize = fontSize;
+            text.color = Color.white;
+            text.alignment = alignment;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        private static InputField CreateInputField(RectTransform parent, string name, string value, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            var rect = CreateUiObject<RectTransform>(name, parent);
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(1, 1);
+            NormalizeTopAnchoredOffsets(ref offsetMin, ref offsetMax);
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+
+            var image = rect.gameObject.AddComponent<Image>();
+            image.color = new Color(0.02f, 0.02f, 0.025f, 1f);
+
+            var input = rect.gameObject.AddComponent<InputField>();
+            input.targetGraphic = image;
+            input.interactable = true;
+            input.readOnly = false;
+            input.lineType = InputField.LineType.MultiLineNewline;
+            input.text = value;
+
+            var text = CreateLabel(rect, "Text", value, 14, new Vector2(8, 6), new Vector2(-8, -6), TextAnchor.UpperLeft);
+            StretchToParent(text.rectTransform, new Vector2(8, 6), new Vector2(-8, -6));
+            text.supportRichText = false;
+            text.raycastTarget = false;
+            input.textComponent = text;
+
+            var placeholder = CreateLabel(rect, "Placeholder", "Type a visualization task...", 14, new Vector2(8, 6), new Vector2(-8, -6), TextAnchor.UpperLeft);
+            StretchToParent(placeholder.rectTransform, new Vector2(8, 6), new Vector2(-8, -6));
+            placeholder.color = new Color(0.7f, 0.7f, 0.7f, 0.65f);
+            placeholder.raycastTarget = false;
+            input.placeholder = placeholder;
+
+            return input;
+        }
+
+        private static Button CreateButton(RectTransform parent, string name, string label, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            var rect = CreateUiObject<RectTransform>(name, parent);
+            rect.anchorMin = new Vector2(0, 1);
+            rect.anchorMax = new Vector2(1, 1);
+            NormalizeTopAnchoredOffsets(ref offsetMin, ref offsetMax);
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+
+            var image = rect.gameObject.AddComponent<Image>();
+            image.color = new Color(0.18f, 0.2f, 0.23f, 1f);
+            image.raycastTarget = true;
+            var button = rect.gameObject.AddComponent<Button>();
+            button.targetGraphic = image;
+
+            var text = CreateLabel(rect, "Label", label, 14, Vector2.zero, Vector2.zero, TextAnchor.MiddleCenter);
+            StretchToParent(text.rectTransform, Vector2.zero, Vector2.zero);
+            text.raycastTarget = false;
+            return button;
+        }
+
+        private static void StretchToParent(RectTransform rect, Vector2 offsetMin, Vector2 offsetMax)
+        {
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = offsetMin;
+            rect.offsetMax = offsetMax;
+        }
+
+        private static void NormalizeTopAnchoredOffsets(ref Vector2 offsetMin, ref Vector2 offsetMax)
+        {
+            if (offsetMin.y > offsetMax.y)
+            {
+                var lowerY = offsetMax.y;
+                offsetMax.y = offsetMin.y;
+                offsetMin.y = lowerY;
+            }
         }
 
         [ContextMenu("Load Backend Datasets")]
@@ -184,6 +409,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
             client = new BackendWorkflowClient(backendBaseUrl, requestTimeoutSeconds);
             datasetStatus = "Loading datasets...";
+            statusMessage = "Loading datasets...";
 
             var okResult = false;
             var message = string.Empty;
@@ -205,6 +431,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 var response = JsonUtility.FromJson<BackendDatasetListResponse>(message);
                 datasets = response != null && response.datasets != null ? response.datasets : new BackendDatasetInfo[0];
                 datasetStatus = string.Format("Loaded {0} dataset(s).", datasets.Length);
+                statusMessage = "Ready. Edit the task and click Run And Render.";
                 if (datasets.Length > 0 && string.IsNullOrWhiteSpace(dataset))
                     dataset = datasets[0].id;
             }
@@ -234,6 +461,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
         private IEnumerator RunCommandAndRender()
         {
+            Debug.Log("EvoVis command window: Run And Render clicked.");
             isRunning = true;
             statusMessage = "Preparing request...";
             EnsureRenderRoot();
@@ -280,15 +508,18 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 workflowId = workflowId,
                 viewType = requestedViewType,
                 execute = executeEvoFlow,
+                requireLlm = requireRealLlm,
                 population = population,
                 generations = generations,
                 eliteSize = eliteSize,
-                timeoutSeconds = requestTimeoutSeconds
+                timeoutSeconds = requestTimeoutSeconds,
+                limit = renderPointLimit,
+                includeSelectedIds = false
             };
 
             var fetchOk = false;
             var responseJson = string.Empty;
-            statusMessage = executeEvoFlow ? "Executing EvoFlow..." : "Requesting cached workflow...";
+            statusMessage = executeEvoFlow ? "Generating visualization from command..." : "Requesting cached workflow...";
             yield return client.RunWorkflowForUnityRender(runRequest, (ok, message) =>
             {
                 fetchOk = ok;
@@ -317,6 +548,12 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 var renderResult = renderCoordinator.Render(backendResult);
                 var selectedCount = backendResult.resultSummary != null ? backendResult.resultSummary.selectedPointCount : 0;
                 statusMessage = string.Format("Rendered {0} view(s), selected points: {1}.", renderResult.RenderedViewCount, selectedCount);
+                if (hideWindowAfterRender)
+                {
+                    showWindow = false;
+                    if (canvasRoot != null)
+                        canvasRoot.SetActive(false);
+                }
             }
             catch (Exception ex)
             {
@@ -346,10 +583,10 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         private void ApplyDynamicPointPreset()
         {
             executeEvoFlow = true;
-            requestedViewType = "Point";
-            dataset = "hurricane_sandy_2012_100k_sample.csv";
+            requestedViewType = "Auto";
+            dataset = "first_week_of_may_2011_10k_sample.csv";
             commandText =
-                "Find concentrated morning pickup hotspots in the Hurricane Sandy sample and render them as a backend-ready point visualization.";
+                "Show all NYC taxi pickup points as a dense 3D point cloud. Do not filter rows. Use pickup location on the ground plane and trip distance or fare as visual height or color.";
         }
 
         private void EnsureRenderRoot()

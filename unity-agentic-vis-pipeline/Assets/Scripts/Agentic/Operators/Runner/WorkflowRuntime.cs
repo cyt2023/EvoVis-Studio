@@ -11,13 +11,14 @@ using OperatorPackage.Filter;
 using OperatorPackage.Query;
 using OperatorPackage.View;
 
-namespace OperatorRunner;
+namespace OperatorRunner
+{
 
 public sealed class WorkflowRuntime
 {
     public RunnerResponse RunFromJson(string requestJson, string requestSourcePath = null)
     {
-        var normalized = RequestNormalizer.Parse(requestJson, JsonDefaults.Options);
+        var normalized = RequestNormalizer.Parse(requestJson);
         ResolveDataPath(normalized.Plan, requestSourcePath);
         return Run(normalized);
     }
@@ -624,4 +625,5 @@ public sealed class WorkflowRuntime
         FilterMask mask => mask.Mask.Count,
         _ => 1
     };
+}
 }

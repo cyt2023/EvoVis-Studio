@@ -115,6 +115,39 @@ More explicitly:
 5. Unity maps the result into renderable views.
 6. Unity renders point, link, STC, or projection-based visual views.
 
+## Packaging The Desktop App
+
+For a Windows desktop build, package the Unity frontend together with the local EvoFlow backend:
+
+1. Prepare the bundled backend:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\prepare_unity_backend_bundle.ps1
+```
+
+This copies `OperatorsDraft/` into `unity-agentic-vis-pipeline/Assets/StreamingAssets/EvoFlowBackend` while excluding local secrets, caches, and generated build folders.
+
+2. Open `unity-agentic-vis-pipeline/` in Unity.
+
+3. Use `File > Build Settings`.
+
+4. Confirm the enabled scene is:
+
+```text
+Assets/Scenes/Agentic/DesktopAgenticApp.unity
+```
+
+5. Select `PC, Mac & Linux Standalone`, target Windows, then build.
+
+6. On the target machine, configure the DashScope key before launching the app:
+
+```powershell
+[Environment]::SetEnvironmentVariable("DASHSCOPE_API_KEY", "your_sk_api_key", [EnvironmentVariableTarget]::User)
+[Environment]::SetEnvironmentVariable("DASHSCOPE_MODEL", "qwen-turbo", [EnvironmentVariableTarget]::User)
+```
+
+Restart the app after setting environment variables. The real API key should stay in local environment variables or an ignored local `.env.local`, not in source control or the Unity build repository.
+
 ## Frontend / Backend Responsibilities
 
 ### Backend responsibilities

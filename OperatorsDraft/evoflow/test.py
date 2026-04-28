@@ -1,10 +1,5 @@
-import dashscope
-from dashscope import Generation
-import os
+from real_llm import call_qwen_turbo
 
-api_key = os.environ.get("DASHSCOPE_API_KEY", "").strip()
-if not api_key:
-    raise SystemExit("DASHSCOPE_API_KEY is not set.")
 
-response = Generation.call(model=Generation.Models.qwen_turbo, api_key=api_key, prompt="测试")
-print(response)
+response = call_qwen_turbo("Reply with exactly: OK", temperature=0)
+print(response["text"])

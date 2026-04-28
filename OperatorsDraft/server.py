@@ -11,16 +11,37 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
+import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Dict, List
 from urllib.parse import parse_qs, urlparse
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 EXPORTS_DIR = ROOT / "exports"
 DEFAULT_WORKFLOW_ID = "test3"
+FROZEN_RUNNER_EXE = ROOT / "EvoFlowRunner.exe"
+
+
+def load_local_env() -> None:
+    for env_path in (ROOT.parent / ".env", ROOT.parent / ".env.local", ROOT / ".env", ROOT / ".env.local"):
+        if not env_path.exists():
+            continue
+
+        with env_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                stripped = line.strip()
+                if not stripped or stripped.startswith("#") or "=" not in stripped:
+                    continue
+
+                key, value = stripped.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and key not in os.environ:
+                    os.environ[key] = value
 
 
 def load_json(path: Path) -> Dict[str, Any]:
@@ -94,6 +115,37 @@ def error_payload(stage: str, message: str, details: str = "") -> Dict[str, Any]
     }
 
 
+def llm_status() -> Dict[str, Any]:
+    load_local_env()
+    has_api_key = bool(os.environ.get("DASHSCOPE_API_KEY", "").strip())
+    model = os.environ.get("DASHSCOPE_MODEL", "qwen-turbo").strip() or "qwen-turbo"
+    ready = has_api_key
+    missing = []
+    if not has_api_key:
+        missing.append("DASHSCOPE_API_KEY")
+
+    return {
+        "ready": ready,
+        "provider": "dashscope-compatible",
+        "model": model,
+        "endpoint": "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions",
+        "apiKeyConfigured": has_api_key,
+        "missing": missing,
+    }
+
+
+def require_llm_ready() -> None:
+    status = llm_status()
+    if status["ready"]:
+        return
+
+    raise RuntimeError(
+        "Real LLM is required but not ready. Missing: "
+        + ", ".join(status["missing"])
+        + ". Set DASHSCOPE_API_KEY."
+    )
+
+
 def make_task_id(task: str) -> str:
     base = "".join(ch.lower() if ch.isalnum() else "_" for ch in (task or "task"))
     base = "_".join(part for part in base.split("_") if part)[:40] or "task"
@@ -101,6 +153,10 @@ def make_task_id(task: str) -> str:
 
 
 def execute_evoflow_task(body: Dict[str, Any]) -> Dict[str, Any]:
+    require_llm = bool(body.get("requireLlm") or body.get("require_llm"))
+    if require_llm:
+        require_llm_ready()
+
     task = str(body.get("task") or body.get("rawText") or "Find concentrated morning pickup hotspots.").strip()
     dataset = resolve_dataset_path(str(body.get("dataset") or body.get("dataPath") or ""))
     task_id = str(body.get("taskId") or body.get("task_id") or make_task_id(task))
@@ -110,23 +166,40 @@ def execute_evoflow_task(body: Dict[str, Any]) -> Dict[str, Any]:
     generations = int(body.get("generations") or 3)
     elite_size = int(body.get("eliteSize") or body.get("elite_size") or 2)
 
-    command = [
-        str(ROOT / "run_evoflow.sh"),
-        "--task",
-        task,
-        "--data-path",
-        str(dataset),
-        "--export-json",
-        str(export_path),
-        "--task-id",
-        task_id,
-        "--population",
-        str(population),
-        "--generations",
-        str(generations),
-        "--elite-size",
-        str(elite_size),
-    ]
+    if FROZEN_RUNNER_EXE.exists():
+        command = [str(FROZEN_RUNNER_EXE)]
+    elif getattr(sys, "frozen", False):
+        raise FileNotFoundError(f"Packaged EvoFlow runner was not found: {FROZEN_RUNNER_EXE}")
+    else:
+        command = [sys.executable, str(ROOT / "evoflow" / "operator_search_main.py")]
+
+    command.extend(
+        [
+            "--task",
+            task,
+            "--data-path",
+            str(dataset),
+            "--export-json",
+            str(export_path),
+            "--task-id",
+            task_id,
+            "--population",
+            str(population),
+            "--generations",
+            str(generations),
+            "--elite-size",
+            str(elite_size),
+        ]
+    )
+    if require_llm:
+        command.append("--require-llm")
+
+    env = os.environ.copy()
+    python_path = str(ROOT / ".python_deps")
+    env["PYTHONPATH"] = python_path + (os.pathsep + env["PYTHONPATH"] if env.get("PYTHONPATH") else "")
+    env["HOME"] = str(ROOT)
+    env["DOTNET_CLI_HOME"] = str(ROOT)
+    env["PATH"] = str(ROOT / ".dotnet") + os.pathsep + env.get("PATH", "")
 
     completed = subprocess.run(
         command,
@@ -134,6 +207,7 @@ def execute_evoflow_task(body: Dict[str, Any]) -> Dict[str, Any]:
         check=True,
         capture_output=True,
         text=True,
+        env=env,
         timeout=int(body.get("timeoutSeconds") or 180),
     )
 
@@ -205,6 +279,7 @@ def adapt_to_unity_backend_result(
     include_selected_ids: bool = True,
     include_links: bool = True,
     summary_only: bool = False,
+    requested_view_type: str | None = None,
 ) -> Dict[str, Any]:
     render_plan = evoflow_result.get("visualization", {}).get("renderPlan", {})
     primary_view = render_plan.get("primaryView", {})
@@ -242,23 +317,39 @@ def adapt_to_unity_backend_result(
                 "y": as_float(position.get("y")),
                 "z": as_float(position.get("z")),
                 "time": as_float(point.get("timeValue")),
+                "colorValue": as_float(point.get("colorValue")),
+                "sizeValue": as_float(point.get("sizeValue")),
                 "isSelected": bool(point.get("selected", False)) or row_id in selected_set,
             }
         )
 
+    returned_point_count = len(points)
     raw_links = geometry.get("links", []) if include_links and not summary_only else []
     links: List[Dict[str, Any]] = []
+    max_returned_links = max(0, returned_point_count // 2)
     for link in raw_links:
+        if len(links) >= max_returned_links:
+            break
+
+        origin_index = as_int(link.get("originIndex"))
+        destination_index = as_int(link.get("destinationIndex"))
+        if origin_index < 0 or destination_index < 0:
+            continue
+        if origin_index >= returned_point_count or destination_index >= returned_point_count:
+            continue
+
         links.append(
             {
-                "originIndex": as_int(link.get("originIndex")),
-                "destinationIndex": as_int(link.get("destinationIndex")),
+                "originIndex": origin_index,
+                "destinationIndex": destination_index,
             }
         )
 
     operators = [{"name": str(name)} for name in selected_workflow.get("operators", [])]
     scores = selected_workflow.get("scores", {})
     view_type = str(primary_view.get("type") or result_summary.get("viewType") or "Point")
+    if requested_view_type and requested_view_type.strip().lower() not in {"auto", "default"}:
+        view_type = requested_view_type.strip()
     view_name = str(primary_view.get("name") or "EvoFlowView")
     include_links = bool(links) and view_type.strip().upper() in {"STC", "LINK", "LINKS"}
     selected_count = as_int(result_summary.get("selectedPointCount"), len(selected_set))
@@ -342,7 +433,7 @@ class EvoFlowRequestHandler(BaseHTTPRequestHandler):
 
         try:
             if path in {"/", "/health", "/api", "/api/health"}:
-                self.write_json({"status": "ok", "service": "evoflow-local-backend"})
+                self.write_json({"status": "ok", "service": "evoflow-local-backend", "llm": llm_status()})
                 return
 
             if path in {"/datasets", "/api/datasets"}:
@@ -382,6 +473,7 @@ class EvoFlowRequestHandler(BaseHTTPRequestHandler):
                     "include_selected_ids": as_bool(body.get("includeSelectedIds"), True),
                     "include_links": as_bool(body.get("includeLinks"), True),
                     "summary_only": as_bool(body.get("summary"), False),
+                    "requested_view_type": str(body.get("viewType") or body.get("view_type") or "Auto"),
                 }
                 self.write_json(adapt_to_unity_backend_result(workflow, **options))
                 return
