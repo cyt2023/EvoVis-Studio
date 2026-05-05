@@ -1,5 +1,7 @@
 # EvoVis Studio
 
+中文说明见 [README_CN.md](README_CN.md).
+
 EvoVis Studio is a desktop-oriented agentic visualization project that connects:
 
 - natural-language task input
