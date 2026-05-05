@@ -115,6 +115,17 @@ More explicitly:
 5. Unity maps the result into renderable views.
 6. Unity renders point, link, STC, or projection-based visual views.
 
+The local backend service now returns Unity-ready render geometry for the main
+view families. Unity requests should normally keep `viewType` set to `Auto`,
+allowing EvoFlow to infer the correct `Point`, `Link`, `STC`, or `Projection2D`
+view from the natural-language task. The backend preserves that inferred view
+type and normalizes the geometry contract before Unity renders it:
+
+- `Point` and hotspot-style requests render as flat point layers.
+- `Link` requests render origin-destination line geometry.
+- `STC` requests render time-normalized height in the returned `z` coordinate.
+- `Projection2D` requests render flat projected point geometry.
+
 ## Packaging The Desktop App
 
 For a Windows desktop build, package the Unity frontend together with the local EvoFlow backend:
@@ -247,8 +258,27 @@ The repository currently includes work toward:
 - local backend-service communication
 - desktop runtime bootstrap and backend autostart
 - Unity-side render dispatch for supported views
+- strict Unity-ready render JSON mapping for point, link, STC, and 2D projection views
 - backend-side workflow search and export logic
 - OD-oriented and STC-related visualization concepts inherited from the adapted TaxiVis foundation
+
+Useful command-window prompts for manual testing:
+
+```text
+Show taxi dropoff hotspots as a point visualization. Use dropoff longitude and latitude and highlight concentrated destination areas.
+```
+
+```text
+Render taxi trips as origin-destination links. Draw lines from pickup locations to dropoff locations and show movement patterns across the city.
+```
+
+```text
+Show all taxi trips in a space-time cube. Use pickup longitude and latitude on the ground plane and pickup time on the vertical axis. Do not filter rows.
+```
+
+```text
+Show all taxi pickup points as a 3D point visualization. Use pickup longitude and latitude on the ground plane, and use fare amount or trip distance as height. Do not filter rows.
+```
 
 ## Included Documentation
 

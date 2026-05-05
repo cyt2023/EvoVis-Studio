@@ -303,14 +303,25 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         private string ResolveBackendRoot()
         {
             var candidates = new List<string>();
-            AddCandidate(candidates, backendRootOverride);
-            AddCandidate(candidates, Path.Combine(Application.streamingAssetsPath, bundledBackendRelativePath));
-
             var projectOrBuildRoot = Directory.GetParent(Application.dataPath)?.FullName;
-            AddCandidate(candidates, Path.Combine(projectOrBuildRoot ?? string.Empty, "OperatorsDraft"));
-
             var workspaceRoot = projectOrBuildRoot != null ? Directory.GetParent(projectOrBuildRoot)?.FullName : null;
-            AddCandidate(candidates, Path.Combine(workspaceRoot ?? string.Empty, "OperatorsDraft"));
+            var projectBackend = Path.Combine(projectOrBuildRoot ?? string.Empty, "OperatorsDraft");
+            var workspaceBackend = Path.Combine(workspaceRoot ?? string.Empty, "OperatorsDraft");
+            var bundledBackend = Path.Combine(Application.streamingAssetsPath, bundledBackendRelativePath);
+
+            AddCandidate(candidates, backendRootOverride);
+            if (Application.isEditor)
+            {
+                AddCandidate(candidates, projectBackend);
+                AddCandidate(candidates, workspaceBackend);
+                AddCandidate(candidates, bundledBackend);
+            }
+            else
+            {
+                AddCandidate(candidates, bundledBackend);
+                AddCandidate(candidates, projectBackend);
+                AddCandidate(candidates, workspaceBackend);
+            }
 
             for (var i = 0; i < candidates.Count; i++)
             {

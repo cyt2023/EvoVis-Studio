@@ -21,7 +21,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
         [TextArea(2, 4)]
         public string taskText = "Show all NYC taxi pickup points as a dense 3D point cloud. Do not filter rows. Use pickup location on the ground plane and trip distance or fare as visual height or color.";
         public string dataset = "first_week_of_may_2011_10k_sample.csv";
-        public string requestedViewType = "Point";
+        public string requestedViewType = "Auto";
         public bool requireRealLlm = true;
         public int population = 1;
         public int generations = 0;
@@ -136,7 +136,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                     task = taskText,
                     dataset = dataset,
                     workflowId = workflowId,
-                    viewType = requestedViewType,
+                    viewType = ResolveRequestViewType(taskText, requestedViewType),
                     execute = true,
                     requireLlm = requireRealLlm,
                     population = population,
@@ -146,6 +146,9 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                     limit = renderPointLimit,
                     includeSelectedIds = includeSelectedIds
                 };
+
+                if (verboseLogging)
+                    Debug.Log("EvoVis backend service request viewType: " + runRequest.viewType);
 
                 yield return client.RunWorkflowForUnityRender(runRequest, (ok, message) =>
                 {
@@ -204,13 +207,18 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 return;
             }
 
+            var primaryView = backendResult.visualizationPayload.views[0];
+            if (verboseLogging)
+                Debug.Log("EvoVis backend service response primary viewType: " + primaryView.viewType + ", viewName: " + primaryView.viewName);
+
             var renderResult = renderCoordinator.Render(backendResult);
             if (verboseLogging)
             {
                 Debug.Log(string.Format(
-                    "Rendered workflow '{0}' from backend service. Views: {1}. Selected points: {2}. Backend built: {3}.",
+                    "Rendered workflow '{0}' from backend service. Views: {1}. Primary view: {2}. Selected points: {3}. Backend built: {4}.",
                     workflowId,
                     renderResult.RenderedViewCount,
+                    primaryView.viewType,
                     backendResult.resultSummary != null ? backendResult.resultSummary.selectedPointCount : 0,
                     backendResult.resultSummary != null && backendResult.resultSummary.backendBuilt));
             }
@@ -250,6 +258,28 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             configuredRenderRoot = renderRoot;
             configuredPointSize = pointSize;
             configuredRenderLinks = renderLinks;
+        }
+
+        private static string ResolveRequestViewType(string taskText, string configuredViewType)
+        {
+            var configured = string.IsNullOrWhiteSpace(configuredViewType) ? "Auto" : configuredViewType.Trim();
+            if (!string.Equals(configured, "Point", System.StringComparison.OrdinalIgnoreCase))
+                return configured;
+
+            var lowerTask = string.IsNullOrWhiteSpace(taskText) ? string.Empty : taskText.ToLowerInvariant();
+            if (lowerTask.Contains("stc") ||
+                lowerTask.Contains("space-time") ||
+                lowerTask.Contains("space time") ||
+                lowerTask.Contains("link") ||
+                lowerTask.Contains("origin-destination") ||
+                lowerTask.Contains("origin destination") ||
+                lowerTask.Contains("projection") ||
+                lowerTask.Contains("2d"))
+            {
+                return "Auto";
+            }
+
+            return configured;
         }
     }
 }

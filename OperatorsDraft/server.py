@@ -331,8 +331,8 @@ def adapt_to_unity_backend_result(
         if len(links) >= max_returned_links:
             break
 
-        origin_index = as_int(link.get("originIndex"))
-        destination_index = as_int(link.get("destinationIndex"))
+        origin_index = as_int(link.get("originIndex", link.get("originPointId")))
+        destination_index = as_int(link.get("destinationIndex", link.get("destinationPointId")))
         if origin_index < 0 or destination_index < 0:
             continue
         if origin_index >= returned_point_count or destination_index >= returned_point_count:
@@ -348,8 +348,10 @@ def adapt_to_unity_backend_result(
     operators = [{"name": str(name)} for name in selected_workflow.get("operators", [])]
     scores = selected_workflow.get("scores", {})
     view_type = str(primary_view.get("type") or result_summary.get("viewType") or "Point")
-    if requested_view_type and requested_view_type.strip().lower() not in {"auto", "default"}:
-        view_type = requested_view_type.strip()
+    requested_override = normalize_requested_view_type(requested_view_type)
+    if requested_override:
+        view_type = requested_override
+    points = normalize_unity_point_geometry(points, view_type)
     view_name = str(primary_view.get("name") or "EvoFlowView")
     include_links = bool(links) and view_type.strip().upper() in {"STC", "LINK", "LINKS"}
     selected_count = as_int(result_summary.get("selectedPointCount"), len(selected_set))
@@ -404,6 +406,115 @@ def adapt_to_unity_backend_result(
     }
 
 
+def normalize_unity_point_geometry(points: List[Dict[str, Any]], view_type: str) -> List[Dict[str, Any]]:
+    """Make the service JSON a Unity-ready geometry contract.
+
+    The backend runner can emit raw temporal values in z/time. Unity should not
+    infer display height from arbitrary channels, so normalize the geometry here.
+    """
+
+    normalized_view_type = str(view_type or "").strip().upper()
+    if not points:
+        return points
+
+    normalize_unity_xy(points)
+
+    if normalized_view_type == "STC":
+        z_values = [
+            as_float(point.get("z")) if abs(as_float(point.get("z"))) > 1e-6 else as_float(point.get("time"))
+            for point in points
+        ]
+        min_z = min(z_values)
+        max_z = max(z_values)
+        z_range = max(max_z - min_z, 1e-6)
+        for index, point in enumerate(points):
+            point["z"] = (z_values[index] - min_z) / z_range
+        return points
+
+    if normalized_view_type in {"PROJECTION2D", "PROJECTION2D_XY", "POINT", "POINTS"}:
+        for point in points:
+            point["z"] = 0.0
+        return points
+
+    if normalized_view_type in {"LINK", "LINKS"}:
+        for point in points:
+            if abs(as_float(point.get("z"))) > 1e-6:
+                point["z"] = max(0.0, min(1.0, as_float(point.get("z"))))
+            else:
+                point["z"] = 0.0
+        return points
+
+    return points
+
+
+def normalize_unity_xy(points: List[Dict[str, Any]]) -> None:
+    x_values = [as_float(point.get("x")) for point in points]
+    y_values = [as_float(point.get("y")) for point in points]
+    if not x_values or not y_values:
+        return
+
+    if all(0.0 <= value <= 1.0 for value in x_values) and all(0.0 <= value <= 1.0 for value in y_values):
+        return
+
+    raw_x_values = [value for value in x_values if value < -1.0 or value > 1.0]
+    raw_y_values = [value for value in y_values if value < -1.0 or value > 1.0]
+    if raw_x_values and raw_y_values:
+        min_x = min(raw_x_values)
+        max_x = max(raw_x_values)
+        min_y = min(raw_y_values)
+        max_y = max(raw_y_values)
+    else:
+        min_x = min(x_values)
+        max_x = max(x_values)
+        min_y = min(y_values)
+        max_y = max(y_values)
+
+    x_range = max(max_x - min_x, 1e-6)
+    y_range = max(max_y - min_y, 1e-6)
+
+    for point in points:
+        x = as_float(point.get("x"))
+        y = as_float(point.get("y"))
+        if x < -1.0 or x > 1.0:
+            point["x"] = max(0.0, min(1.0, (x - min_x) / x_range))
+        else:
+            point["x"] = max(0.0, min(1.0, x))
+
+        if y < -1.0 or y > 1.0:
+            point["y"] = max(0.0, min(1.0, (y - min_y) / y_range))
+        else:
+            point["y"] = max(0.0, min(1.0, y))
+
+
+def normalize_requested_view_type(value: str | None) -> str:
+    if not value:
+        return ""
+
+    text = str(value).strip()
+    if not text:
+        return ""
+
+    canonical = {
+        "auto": "",
+        "default": "",
+        "inferred": "",
+        "point": "Point",
+        "points": "Point",
+        "scatter": "Point",
+        "scatterplot": "Point",
+        "scatter_plot": "Point",
+        "stc": "STC",
+        "space-time-cube": "STC",
+        "space_time_cube": "STC",
+        "projection2d": "Projection2D",
+        "projection_2d": "Projection2D",
+        "2d": "Projection2D",
+        "link": "Link",
+        "links": "Link",
+    }
+    return canonical.get(text.lower(), "")
+
+
 def render_options_from_query(query: Dict[str, List[str]]) -> Dict[str, Any]:
     limit_text = first_query_value(query, "limit", "").strip()
     point_limit = None
@@ -415,6 +526,7 @@ def render_options_from_query(query: Dict[str, List[str]]) -> Dict[str, Any]:
         "include_selected_ids": as_bool(first_query_value(query, "includeSelectedIds", "true"), True),
         "include_links": as_bool(first_query_value(query, "includeLinks", "true"), True),
         "summary_only": as_bool(first_query_value(query, "summary", "false"), False),
+        "requested_view_type": first_query_value(query, "viewType", first_query_value(query, "view_type", "Auto")),
     }
 
 

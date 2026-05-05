@@ -45,58 +45,20 @@ namespace ImmersiveTaxiVis.Integration.Mapping
             var positions = new Vector3[view.points.Length];
             var pointColors = new Color[view.points.Length];
             var pointSizes = Enumerable.Repeat(1f, view.points.Length).ToArray();
-            var useTimeAsHeight = ShouldUseTimeAsHeight(view);
-            var useColorValueAsHeight = !useTimeAsHeight && ShouldUseColorValueAsHeight(view);
-            var minTime = useTimeAsHeight ? view.points.Min(point => point.time) : 0f;
-            var maxTime = useTimeAsHeight ? view.points.Max(point => point.time) : 0f;
-            var timeRange = Mathf.Max(1e-6f, maxTime - minTime);
-            var minColorValue = useColorValueAsHeight ? view.points.Min(point => point.colorValue) : 0f;
-            var maxColorValue = useColorValueAsHeight ? view.points.Max(point => point.colorValue) : 0f;
+            var normalizedViewType = NormalizeViewType(view.viewType);
+            var minColorValue = view.points.Min(point => point.colorValue);
+            var maxColorValue = view.points.Max(point => point.colorValue);
             var colorValueRange = Mathf.Max(1e-6f, maxColorValue - minColorValue);
-            var heightValues = !useTimeAsHeight && !useColorValueAsHeight ? BuildSubtleSpatialHeights(view.points) : null;
 
             var selectedCount = 0;
             for (var i = 0; i < view.points.Length; i++)
             {
                 var point = view.points[i];
                 var isSelected = point.isSelected || (!string.IsNullOrEmpty(point.id) && selectedIds.Contains(point.id));
+                var colorT = Mathf.Clamp01((point.colorValue - minColorValue) / colorValueRange);
 
-                var valueT = 0f;
-                if (useTimeAsHeight)
-                {
-                    valueT = Mathf.Clamp01((point.time - minTime) / timeRange);
-                    var height = 0.035f + valueT * 0.68f;
-                    if (isSelected)
-                    {
-                        height = Mathf.Min(0.82f, height + 0.06f);
-                    }
-
-                    positions[i] = new Vector3(point.x - 0.5f, height, point.y - 0.5f);
-                }
-                else if (useColorValueAsHeight)
-                {
-                    valueT = Mathf.Clamp01((point.colorValue - minColorValue) / colorValueRange);
-                    var height = 0.035f + valueT * 0.62f;
-                    if (isSelected)
-                    {
-                        height = Mathf.Min(0.82f, height + 0.06f);
-                    }
-
-                    positions[i] = new Vector3(point.x - 0.5f, height, point.y - 0.5f);
-                }
-                else
-                {
-                    var floorHeight = heightValues != null ? heightValues[i] : 0.015f;
-                    if (isSelected)
-                    {
-                        floorHeight = Mathf.Min(0.22f, floorHeight + 0.035f);
-                    }
-
-                    positions[i] = Mathf.Abs(point.z) < 1e-6f
-                        ? new Vector3(point.x - 0.5f, floorHeight, point.y - 0.5f)
-                        : new Vector3(point.x - 0.5f, point.z, point.y - 0.5f);
-                }
-                pointColors[i] = isSelected ? SelectedPointColor : ColorForValue(useTimeAsHeight || useColorValueAsHeight ? valueT : 0.25f);
+                positions[i] = new Vector3(point.x - 0.5f, point.z, point.y - 0.5f);
+                pointColors[i] = isSelected ? SelectedPointColor : ColorForValue(colorT);
 
                 if (isSelected)
                 {
@@ -112,7 +74,7 @@ namespace ImmersiveTaxiVis.Integration.Mapping
             return new PointRenderModel
             {
                 ViewName = string.IsNullOrWhiteSpace(view.viewName) ? "BackendView" : view.viewName,
-                ViewType = NormalizeViewType(view.viewType),
+                ViewType = normalizedViewType,
                 ProjectionPlane = NormalizeProjectionPlane(view),
                 Positions = positions,
                 PointColors = pointColors,
@@ -124,56 +86,6 @@ namespace ImmersiveTaxiVis.Integration.Mapping
                 Visible = view.visible,
                 PointSizeScale = view.pointSizeScale <= 0f ? 1f : view.pointSizeScale
             };
-        }
-
-        private static float[] BuildSubtleSpatialHeights(BackendPointDefinition[] points)
-        {
-            var heights = new float[points.Length];
-            if (points == null || points.Length == 0)
-            {
-                return heights;
-            }
-
-            var minTime = points.Min(point => point.time);
-            var maxTime = points.Max(point => point.time);
-            var timeRange = Mathf.Max(1e-6f, maxTime - minTime);
-
-            for (var i = 0; i < points.Length; i++)
-            {
-                var normalizedTime = (points[i].time - minTime) / timeRange;
-                heights[i] = 0.025f + normalizedTime * 0.22f;
-            }
-
-            return heights;
-        }
-
-        private static bool ShouldUseTimeAsHeight(BackendViewDefinition view)
-        {
-            if (view == null || view.points == null || view.points.Length == 0)
-            {
-                return false;
-            }
-
-            var minTime = view.points.Min(point => point.time);
-            var maxTime = view.points.Max(point => point.time);
-            if (maxTime - minTime > 1e-5f)
-            {
-                return true;
-            }
-
-            return false;
-        }
-
-        private static bool ShouldUseColorValueAsHeight(BackendViewDefinition view)
-        {
-            if (view == null || view.points == null || view.points.Length == 0)
-            {
-                return false;
-            }
-
-            var minValue = view.points.Min(point => point.colorValue);
-            var maxValue = view.points.Max(point => point.colorValue);
-            return maxValue - minValue > 1e-5f;
         }
 
         private static Color ColorForValue(float t)

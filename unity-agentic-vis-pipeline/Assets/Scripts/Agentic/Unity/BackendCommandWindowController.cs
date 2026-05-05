@@ -506,7 +506,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
                 task = commandText,
                 dataset = dataset,
                 workflowId = workflowId,
-                viewType = requestedViewType,
+                viewType = ResolveRequestViewType(commandText, requestedViewType),
                 execute = executeEvoFlow,
                 requireLlm = requireRealLlm,
                 population = population,
@@ -520,6 +520,7 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             var fetchOk = false;
             var responseJson = string.Empty;
             statusMessage = executeEvoFlow ? "Generating visualization from command..." : "Requesting cached workflow...";
+            Debug.Log("EvoVis command request viewType: " + runRequest.viewType);
             yield return client.RunWorkflowForUnityRender(runRequest, (ok, message) =>
             {
                 fetchOk = ok;
@@ -544,10 +545,12 @@ namespace ImmersiveTaxiVis.Integration.Runtime
 
             try
             {
+                var primaryView = backendResult.visualizationPayload.views[0];
+                Debug.Log("EvoVis command response primary viewType: " + primaryView.viewType + ", viewName: " + primaryView.viewName);
                 statusMessage = "Rendering...";
                 var renderResult = renderCoordinator.Render(backendResult);
                 var selectedCount = backendResult.resultSummary != null ? backendResult.resultSummary.selectedPointCount : 0;
-                statusMessage = string.Format("Rendered {0} view(s), selected points: {1}.", renderResult.RenderedViewCount, selectedCount);
+                statusMessage = string.Format("Rendered {0} {1} view(s), selected points: {2}.", renderResult.RenderedViewCount, primaryView.viewType, selectedCount);
                 if (hideWindowAfterRender)
                 {
                     showWindow = false;
@@ -572,11 +575,33 @@ namespace ImmersiveTaxiVis.Integration.Runtime
             return int.TryParse(text, out var parsed) ? parsed : currentValue;
         }
 
+        private static string ResolveRequestViewType(string taskText, string configuredViewType)
+        {
+            var configured = string.IsNullOrWhiteSpace(configuredViewType) ? "Auto" : configuredViewType.Trim();
+            if (!string.Equals(configured, "Point", StringComparison.OrdinalIgnoreCase))
+                return configured;
+
+            var lowerTask = string.IsNullOrWhiteSpace(taskText) ? string.Empty : taskText.ToLowerInvariant();
+            if (lowerTask.Contains("stc") ||
+                lowerTask.Contains("space-time") ||
+                lowerTask.Contains("space time") ||
+                lowerTask.Contains("link") ||
+                lowerTask.Contains("origin-destination") ||
+                lowerTask.Contains("origin destination") ||
+                lowerTask.Contains("projection") ||
+                lowerTask.Contains("2d"))
+            {
+                return "Auto";
+            }
+
+            return configured;
+        }
+
         private void ApplyCachedPreset()
         {
             executeEvoFlow = false;
             workflowId = "test3";
-            requestedViewType = "Point";
+            requestedViewType = "Auto";
             dataset = "hurricane_sandy_2012_100k_sample.csv";
         }
 

@@ -167,7 +167,7 @@ MonoBehaviour:
     filter rows. Use pickup location on the ground plane and fare as visual height
     or color.
   startupDataset: hurricane_sandy_2012_100k_sample.csv
-  startupViewType: Point
+  startupViewType: Auto
   pointSize: 0.18
   renderLinks: 1
   renderRootLocalPosition: {x: 0, y: 0, z: 0}

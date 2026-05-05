@@ -47,6 +47,16 @@ The preferred desktop-app direction is now a local backend-service path:
 
 `Unity desktop app -> local EvoFlow backend service -> Unity-ready render JSON -> existing Unity renderer`
 
+In this path Unity should normally send `viewType: Auto`. EvoFlow infers the
+primary view type from the task, and the backend service adapts the result into a
+Unity-ready render contract before the frontend draws it. The current render
+contract supports:
+
+- flat point and hotspot views
+- origin-destination link views
+- Space-Time Cube views with normalized temporal height
+- flat 2D projection views
+
 Primary integrated test assets:
 - `Assets/StreamingAssets/Agentic/Workflows/test3_workflow.json`
 - `Assets/StreamingAssets/Agentic/Data/hurricane_sandy_2012_100k_sample.csv`
@@ -81,9 +91,11 @@ Available local endpoints:
 - `GET http://127.0.0.1:8000/api/health`
 - `GET http://127.0.0.1:8000/api/workflow/test3`
 - `GET http://127.0.0.1:8000/api/render/test3`
+- `POST http://127.0.0.1:8000/api/render/run`
 
 Unity-side entry point:
 - `Assets/Scripts/Agentic/Unity/BackendServiceRenderController.cs`
+- `Assets/Scripts/Agentic/Unity/BackendCommandWindowController.cs`
 
 This path avoids treating Unity as the main operator runtime. Unity requests a backend result from EvoFlow and then renders the returned JSON through the existing frontend pipeline.
 
@@ -163,10 +175,29 @@ Recommended environment:
 
 Current test flow:
 1. Open the Unity project.
-2. Use the workflow runtime demo entry point in a scene.
-3. Point it to `Assets/StreamingAssets/Agentic/Workflows/test3_workflow.json` or keep the default setting.
+2. Open or create the desktop app scene.
+3. Keep the command window's requested view type as `Auto`.
 4. Run the scene.
-5. Verify that Unity resolves the CSV path, executes the operator workflow, and renders the point-based result.
+5. Enter natural-language prompts for point, link, STC, or 2D projection views.
+6. Verify the Unity Console log for the backend response primary view type.
+
+Manual prompts used for current validation:
+
+```text
+Show taxi dropoff hotspots as a point visualization. Use dropoff longitude and latitude and highlight concentrated destination areas.
+```
+
+```text
+Render taxi trips as origin-destination links. Draw lines from pickup locations to dropoff locations and show movement patterns across the city.
+```
+
+```text
+Show all taxi trips in a space-time cube. Use pickup longitude and latitude on the ground plane and pickup time on the vertical axis. Do not filter rows.
+```
+
+```text
+Show all taxi pickup points as a 3D point visualization. Use pickup longitude and latitude on the ground plane, and use fare amount or trip distance as height. Do not filter rows.
+```
 
 ## Notes
 

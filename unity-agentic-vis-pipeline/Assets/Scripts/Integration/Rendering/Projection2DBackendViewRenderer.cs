@@ -43,10 +43,10 @@ namespace ImmersiveTaxiVis.Integration.Rendering
                         projected[i] = new Vector3(position.x, 0f, position.z);
                         break;
                     case "YZ":
-                        projected[i] = new Vector3(0f, position.y, position.z);
+                        projected[i] = new Vector3(0f, 0f, position.z);
                         break;
                     default:
-                        projected[i] = new Vector3(position.x, position.y, 0f);
+                        projected[i] = new Vector3(position.x, 0f, position.z);
                         break;
                 }
             }

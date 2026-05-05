@@ -945,7 +945,11 @@ def build_workflow(candidate: Candidate) -> list[str]:
         workflow.append("FilterRowsOperator")
     if "NormalizeAttributesOperator" in chosen:
         workflow.append("NormalizeAttributesOperator")
-    if "EncodeTimeOperator" in chosen or (task_hints.get("requireTemporalFilter") and TASK.request.get("timeColumn")):
+    if (
+        "EncodeTimeOperator" in chosen
+        or (task_hints.get("requireTemporalFilter") and TASK.request.get("timeColumn"))
+        or (required_view == "STC" and TASK.request.get("timeColumn"))
+    ):
         workflow.append("EncodeTimeOperator")
 
     # Mapping is the bridge from tabular data to view/filter operators.

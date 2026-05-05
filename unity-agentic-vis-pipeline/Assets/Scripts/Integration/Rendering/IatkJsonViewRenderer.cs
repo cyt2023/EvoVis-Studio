@@ -37,11 +37,7 @@ namespace ImmersiveTaxiVis.Integration.Rendering
             View linkView = null;
             if (renderLinks && model.Links != null && model.Links.Length > 0)
             {
-                linkView = RenderLinks(viewRoot.transform, model, positions);
-                if (linkView == null)
-                {
-                    Debug.LogWarning("Link rendering was skipped because the line view could not be created.");
-                }
+                AddFallbackLinkRenderers(viewRoot.transform, model, positions);
             }
 
             viewRoot.SetActive(model.Visible);
@@ -165,6 +161,41 @@ namespace ImmersiveTaxiVis.Integration.Rendering
                 Debug.LogWarning("Failed to create IATK link view. Falling back to point-only rendering. " + ex);
                 Object.Destroy(linkContainer);
                 return null;
+            }
+        }
+
+        private static void AddFallbackLinkRenderers(Transform parent, PointRenderModel model, Vector3[] positions)
+        {
+            if (model == null || model.Links == null || positions == null || positions.Length == 0)
+            {
+                return;
+            }
+
+            var fallbackRoot = new GameObject("UnityLineLinks");
+            fallbackRoot.transform.SetParent(parent, false);
+            var material = CreateUnlitMaterial(DefaultLinkColor);
+            var maxLinks = Mathf.Min(model.Links.Length, 2500);
+
+            for (var i = 0; i < maxLinks; i++)
+            {
+                var link = model.Links[i];
+                if (link == null ||
+                    link.OriginIndex < 0 ||
+                    link.DestinationIndex < 0 ||
+                    link.OriginIndex >= positions.Length ||
+                    link.DestinationIndex >= positions.Length)
+                {
+                    continue;
+                }
+
+                var origin = positions[link.OriginIndex];
+                var destination = positions[link.DestinationIndex];
+                if ((origin - destination).sqrMagnitude <= 0.0000001f)
+                {
+                    continue;
+                }
+
+                AddLine(fallbackRoot.transform, origin, destination, material, 0.0022f);
             }
         }
 
