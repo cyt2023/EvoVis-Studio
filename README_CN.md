@@ -266,12 +266,3 @@ python -m unittest tests.test_server_contract
 - EvoFlow 后端 workflow search 和 export
 - 继承自 TaxiVis 思路的 OD 与 STC 可视化概念
 
-## 当前状态
-
-本项目应理解为：
-
-- 已超过玩具原型
-- 仍不是完整生产级产品
-- 正在围绕桌面端研究和开发工作流持续完善
-
-如果修改了后端服务代码，测试 Unity 前请停止 Play Mode 并重启本地后端进程，否则 Unity 可能仍连接旧的 `python` 或 `EvoFlowBackend` 进程。
